@@ -1,23 +1,32 @@
 <?php
-header('Content-Type: application/json; charset=utf-8');
-require_once __DIR__ . "/db.php";
+require_once "db.php";
 
-$user_id = intval($_POST["user_id"] ?? 0);
-$device_name = trim($_POST["device_name"] ?? "");
-$device_code = trim($_POST["device_code"] ?? "");
+$raw = file_get_contents("php://input");
+$data = json_decode($raw, true);
 
-if ($user_id<=0 || $device_name==="" || $device_code==="") {
-  echo json_encode(["success"=>false, "message"=>"empty fields"]); exit;
+$user_name   = trim($data["user_name"] ?? "");
+$device_name = trim($data["device_name"] ?? "");
+$device_id   = trim($data["device_id"] ?? "");
+
+if ($user_name === "" || $device_name === "" || $device_id === "") {
+  echo json_encode(["success" => false, "message" => "Missing fields"]);
+  exit();
 }
 
-$stmt = $conn->prepare("INSERT INTO devices(user_id,device_name,device_code) VALUES(?,?,?)");
-if (!$stmt) { http_response_code(500); echo json_encode(["success"=>false,"message"=>"SQL prepare failed (devices)"]); exit; }
-$stmt->bind_param("iss", $user_id, $device_name, $device_code);
+// Create table fields accordingly (see SQL below)
+$stmt = $conn->prepare("INSERT INTO devices (user_name, device_name, device_id) VALUES (?, ?, ?)");
+$stmt->bind_param("sss", $user_name, $device_name, $device_id);
 
 if ($stmt->execute()) {
-  echo json_encode(["success"=>true, "message"=>"device added"]);
+  echo json_encode(["success" => true, "message" => "Device added"]);
 } else {
-  http_response_code(500);
-  echo json_encode(["success"=>false, "message"=>"device add failed"]);
+  // Duplicate device_id (unique constraint)
+  if ($conn->errno == 1062) {
+    echo json_encode(["success" => false, "message" => "Device already added"]);
+  } else {
+    echo json_encode(["success" => false, "message" => "Insert failed"]);
+  }
 }
-exit;
+$stmt->close();
+$conn->close();
+?>

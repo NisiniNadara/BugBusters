@@ -256,8 +256,8 @@ class AlertItem extends StatelessWidget {
   final String title;
   final String time;
   final bool active;
-  final String severity; // ✅ Day 6
-  final String message;  // ✅ Day 6
+  final String severity; 
+  final String message; 
   final VoidCallback onDelete;
 
   const AlertItem({

@@ -15,8 +15,11 @@ class _SignUpPageState extends State<SignUpPage> {
   final firstNameController = TextEditingController();
   final lastNameController = TextEditingController();
   final emailController = TextEditingController();
+  final telephoneController = TextEditingController();
   final passwordController = TextEditingController();
   final confirmPasswordController = TextEditingController();
+
+  String? selectedRole;
 
   bool _isLoading = false;
 
@@ -25,6 +28,7 @@ class _SignUpPageState extends State<SignUpPage> {
     firstNameController.dispose();
     lastNameController.dispose();
     emailController.dispose();
+    telephoneController.dispose();
     passwordController.dispose();
     confirmPasswordController.dispose();
     super.dispose();
@@ -36,36 +40,59 @@ class _SignUpPageState extends State<SignUpPage> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   }
 
+  String? _validatePassword(String? v) {
+    final val = (v ?? "").trim();
+    if (val.isEmpty) return 'Password required';
+    if (val.length != 6) return 'Password must be exactly 6 characters';
+    if (!RegExp(r'[A-Za-z]').hasMatch(val)) {
+      return 'Password must include letters';
+    }
+    if (!RegExp(r'\d').hasMatch(val)) {
+      return 'Password must include digits';
+    }
+    return null;
+  }
+
+  String? _validateTelephone(String? v) {
+    final val = (v ?? "").trim();
+    if (val.isEmpty) return 'Telephone required';
+    if (!RegExp(r'^\+?[0-9]{7,15}$').hasMatch(val)) {
+      return 'Invalid telephone number';
+    }
+    return null;
+  }
+
   Future<void> _handleSignUp() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final first = firstNameController.text.trim();
-    final last = lastNameController.text.trim();
-    final email = emailController.text.trim();
-    final password = passwordController.text.trim();
+    if (selectedRole == null) {
+      _showMsg("Role required");
+      return;
+    }
 
     setState(() => _isLoading = true);
+
     try {
       final result = await ApiService.register(
-  firstName: first,
-  lastName: last,
-  email: email,
-  password: password,
-);
-
-    
+        firstName: firstNameController.text.trim(),
+        lastName: lastNameController.text.trim(),
+        email: emailController.text.trim(),
+        telephone: telephoneController.text.trim(),
+        role: selectedRole!,
+        password: passwordController.text.trim(),
+      );
 
       if (result["success"] == true) {
-        _showMsg("Register success. Please login.");
+        _showMsg("Registration successful. Confirmation email sent.");
 
         if (!mounted) return;
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (context) => SecondPage()),
+          MaterialPageRoute(builder: (_) => SecondPage()),
           (route) => false,
         );
       } else {
-        _showMsg((result["message"] ?? "Register failed").toString());
+        _showMsg(result["message"].toString());
       }
     } catch (e) {
       _showMsg("Error: $e");
@@ -113,74 +140,54 @@ class _SignUpPageState extends State<SignUpPage> {
                 key: _formKey,
                 child: Column(
                   children: [
-                    buildField(
-                      label: 'first Name',
-                      controller: firstNameController,
-                      validator: (v) => (v == null || v.trim().isEmpty)
-                          ? 'First name required'
-                          : null,
-                    ),
+                    buildField(label: 'first Name', controller: firstNameController),
                     const SizedBox(height: 12),
-                    buildField(
-                      label: 'last Name',
-                      controller: lastNameController,
-                      validator: (v) => (v == null || v.trim().isEmpty)
-                          ? 'Last name required'
-                          : null,
-                    ),
+                    buildField(label: 'last Name', controller: lastNameController),
                     const SizedBox(height: 12),
                     buildField(
                       label: 'email',
                       controller: emailController,
-                      validator: (v) {
-                        final val = (v ?? "").trim();
-                        if (val.isEmpty) return 'Email required';
-                        if (!_isValidEmail(val)) return 'Invalid email';
-                        return null;
-                      },
+                      validator: (v) =>
+                          _isValidEmail(v ?? "") ? null : 'Invalid email',
                     ),
+                    const SizedBox(height: 12),
+                    buildField(
+                      label: 'telephone',
+                      controller: telephoneController,
+                      keyboardType: TextInputType.phone,
+                      validator: _validateTelephone,
+                    ),
+                    const SizedBox(height: 12),
+                    buildRoleDropdown(),
                     const SizedBox(height: 12),
                     buildField(
                       label: 'password',
                       controller: passwordController,
                       isPassword: true,
-                      validator: (v) {
-                        final val = (v ?? "").trim();
-                        if (val.isEmpty) return 'Password required';
-                        if (val.length < 6) return 'Min 6 characters';
-                        return null;
-                      },
+                      validator: _validatePassword,
                     ),
                     const SizedBox(height: 12),
                     buildField(
                       label: 'Confirm password',
                       controller: confirmPasswordController,
                       isPassword: true,
-                      validator: (v) {
-                        if ((v ?? "") != passwordController.text) {
-                          return 'Passwords do not match';
-                        }
-                        return null;
-                      },
+                      validator: (v) =>
+                          v == passwordController.text ? null : 'Passwords do not match',
                     ),
                     const SizedBox(height: 20),
                     SizedBox(
                       width: double.infinity,
                       height: 45,
                       child: ElevatedButton(
+                        onPressed: _isLoading ? null : _handleSignUp,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(25),
                           ),
                         ),
-                        onPressed: _isLoading ? null : _handleSignUp,
                         child: _isLoading
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
+                            ? const CircularProgressIndicator(strokeWidth: 2)
                             : const Text(
                                 'Sign Up',
                                 style: TextStyle(
@@ -200,16 +207,43 @@ class _SignUpPageState extends State<SignUpPage> {
     );
   }
 
+  Widget buildRoleDropdown() {
+    return DropdownButtonFormField<String>(
+      value: selectedRole,
+      validator: (v) => v == null ? 'Role required' : null,
+      dropdownColor: const Color(0xFF1A5319),
+      style: const TextStyle(color: Colors.white),
+      iconEnabledColor: Colors.white,
+      decoration: InputDecoration(
+        labelText: 'role',
+        labelStyle: const TextStyle(color: Colors.white),
+        filled: true,
+        fillColor: Colors.white24,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+      ),
+      items: const [
+        DropdownMenuItem(value: "Farmer", child: Text("Farmer")),
+        DropdownMenuItem(value: "Technician", child: Text("Technician")),
+      ],
+      onChanged: (val) => setState(() => selectedRole = val),
+    );
+  }
+
   Widget buildField({
     required String label,
     required TextEditingController controller,
     bool isPassword = false,
     String? Function(String?)? validator,
+    TextInputType keyboardType = TextInputType.text,
   }) {
     return TextFormField(
       controller: controller,
       obscureText: isPassword,
       validator: validator,
+      keyboardType: keyboardType,
       style: const TextStyle(color: Colors.white),
       decoration: InputDecoration(
         labelText: label,
@@ -220,7 +254,6 @@ class _SignUpPageState extends State<SignUpPage> {
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,
         ),
-        errorStyle: const TextStyle(color: Colors.yellow),
       ),
     );
   }

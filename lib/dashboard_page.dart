@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'pump_health_page.dart';
 import 'alerts_page.dart';
-import 'settings_page.dart'; 
+import 'settings_page.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -11,6 +12,21 @@ class DashboardPage extends StatefulWidget {
 }
 
 class _DashboardPageState extends State<DashboardPage> {
+  String firstName = "";
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserName();
+  }
+
+  Future<void> _loadUserName() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      firstName = prefs.getString("first_name") ?? "";
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -33,16 +49,16 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    SizedBox(height: 20),
-                    Text(
+                  children: [
+                    const SizedBox(height: 20),
+                    const Text(
                       "Welcome back,",
                       style: TextStyle(color: Colors.white70),
                     ),
-                    SizedBox(height: 6),
+                    const SizedBox(height: 6),
                     Text(
-                      "Krish Farmer !",
-                      style: TextStyle(
+                      firstName.isEmpty ? "Welcome !" : "$firstName !",
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 26,
                         fontWeight: FontWeight.bold,
@@ -59,7 +75,8 @@ class _DashboardPageState extends State<DashboardPage> {
                 offset: const Offset(0, -30),
                 child: Container(
                   margin: const EdgeInsets.symmetric(horizontal: 36),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(18),
@@ -103,7 +120,8 @@ class _DashboardPageState extends State<DashboardPage> {
               //  PUMP HEALTH STATUS
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 24),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(20),
@@ -116,7 +134,8 @@ class _DashboardPageState extends State<DashboardPage> {
                   children: [
                     const Text(
                       "Pump Health Status",
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 10),
                     Row(
@@ -215,7 +234,7 @@ class _DashboardPageState extends State<DashboardPage> {
             },
           ),
 
-          // SETTINGS (FIXED)
+          // SETTINGS
           BottomItem(
             icon: Icons.settings,
             label: "Settings",

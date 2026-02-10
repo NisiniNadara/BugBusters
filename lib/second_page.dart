@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'change_password_page.dart';
 import 'sign_up_page.dart';
 import 'add_device_page.dart';
 import 'api_service.dart';
 
-// ✅ ADD THIS IMPORT (your settings page)
-import 'settings_page.dart';
-
 class SecondPage extends StatefulWidget {
+  const SecondPage({super.key});
+
   @override
   State<SecondPage> createState() => _SecondPageState();
 }
@@ -46,19 +46,39 @@ class _SecondPageState extends State<SecondPage> {
     }
 
     setState(() => _isLoading = true);
+
     try {
       final result = await ApiService.login(email: email, password: password);
 
       if (result["success"] == true) {
-        final sp = await SharedPreferences.getInstance();
-        await sp.setString("user_id", result["user_id"].toString());
+        // Expecting: result["user"] = { user_id, first_name, last_name, email, role, ... }
+        final user = result["user"];
 
+        if (user == null) {
+          _msg("Login success but user data missing");
+          return;
+        }
+
+        final prefs = await SharedPreferences.getInstance();
+
+        // Save user_id as INT (important for pump dropdown filtering)
+        final int userId = int.tryParse(user["user_id"].toString()) ?? 0;
+        await prefs.setInt("user_id", userId);
+
+        // Save profile info for Dashboard/Settings/Profile etc.
+        await prefs.setString("first_name", (user["first_name"] ?? "").toString());
+        await prefs.setString("last_name", (user["last_name"] ?? "").toString());
+        await prefs.setString("email", (user["email"] ?? "").toString());
+        await prefs.setString("role", (user["role"] ?? "").toString());
+
+        // Go to AddDevicePage
+        if (!mounted) return;
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => AddDevicePage()),
+          MaterialPageRoute(builder: (_) => AddDevicePage()),
         );
       } else {
-        _msg(result["message"].toString());
+        _msg((result["message"] ?? "Login failed").toString());
       }
     } catch (e) {
       _msg("Error: $e");
@@ -67,17 +87,11 @@ class _SecondPageState extends State<SecondPage> {
     }
   }
 
-  // ✅ Forgot password action
   void _openForgotPassword() {
-    // If your Settings page has "Change Password" inside it,
-    // open Settings page and user can change password there.
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const SettingsPage()),
+      MaterialPageRoute(builder: (_) => const ChangePasswordPage()),
     );
-
-    // If you have a separate change password page like ChangePasswordPage(),
-    // tell me the file name and I will change this route.
   }
 
   @override
@@ -159,7 +173,6 @@ class _SecondPageState extends State<SecondPage> {
 
                   const SizedBox(height: 10),
 
-                  // ✅ SAME UI TEXT, just made clickable
                   Align(
                     alignment: Alignment.center,
                     child: GestureDetector(
@@ -211,7 +224,7 @@ class _SecondPageState extends State<SecondPage> {
                       onTap: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => SignUpPage()),
+                          MaterialPageRoute(builder: (_) => const SignUpPage()),
                         );
                       },
                       child: Text(

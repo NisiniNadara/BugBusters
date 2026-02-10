@@ -1,38 +1,62 @@
 <?php
-header('Content-Type: application/json; charset=utf-8');
-require_once __DIR__ . "/db.php";
+header("Content-Type: application/json; charset=UTF-8");
+require_once __DIR__ . "/db.php"; // gives $conn (mysqli)
 
-$email    = strtolower(trim($_POST["email"] ?? ""));
-$password = trim($_POST["password"] ?? "");
+$raw = file_get_contents("php://input");
+$data = json_decode($raw, true);
+
+if (!is_array($data)) {
+  echo json_encode(["success" => false, "message" => "Invalid JSON input"]);
+  exit;
+}
+
+$email = trim($data["email"] ?? "");
+$password = trim($data["password"] ?? "");
 
 if ($email === "" || $password === "") {
-  echo json_encode(["success"=>false, "message"=>"empty fields"]);
+  echo json_encode(["success" => false, "message" => "Missing email or password"]);
   exit;
 }
 
 if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-  echo json_encode(["success"=>false, "message"=>"invalid email"]);
+  echo json_encode(["success" => false, "message" => "Invalid email"]);
   exit;
 }
 
-$stmt = $conn->prepare(
-  "SELECT user_id, password FROM users WHERE email=? LIMIT 1"
-);
+// users table password = CHAR(6) -> compare plain (your DB design)
+$stmt = $conn->prepare("SELECT user_id, first_name, last_name, email, telephone, role, password FROM users WHERE email = ? LIMIT 1");
+if (!$stmt) {
+  echo json_encode(["success" => false, "message" => "Prepare failed: " . $conn->error]);
+  exit;
+}
+
 $stmt->bind_param("s", $email);
 $stmt->execute();
 $res = $stmt->get_result();
 
-if ($row = $res->fetch_assoc()) {
-  if ($password === $row["password"]) {
-    echo json_encode([
-      "success" => true,
-      "message" => "login success",
-      "user_id" => $row["user_id"]
-    ]);
-  } else {
-    echo json_encode(["success"=>false, "message"=>"wrong password"]);
-  }
-} else {
-  echo json_encode(["success"=>false, "message"=>"user not found"]);
+if (!$res || $res->num_rows === 0) {
+  echo json_encode(["success" => false, "message" => "User not found"]);
+  exit;
 }
-exit;
+
+$user = $res->fetch_assoc();
+$stmt->close();
+
+if ($user["password"] !== $password) {
+  echo json_encode(["success" => false, "message" => "Invalid password"]);
+  exit;
+}
+
+// success
+echo json_encode([
+  "success" => true,
+  "message" => "Login success",
+  "user" => [
+    "user_id" => (int)$user["user_id"],
+    "first_name" => $user["first_name"],
+    "last_name" => $user["last_name"],
+    "email" => $user["email"],
+    "telephone" => $user["telephone"],
+    "role" => $user["role"],
+  ]
+]);

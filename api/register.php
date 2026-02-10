@@ -1,68 +1,125 @@
 <?php
-header('Content-Type: application/json; charset=utf-8');
-require_once __DIR__ . "/db.php";
+header("Content-Type: application/json; charset=UTF-8");
 
-$first_name = trim($_POST["first_name"] ?? "");
-$last_name  = trim($_POST["last_name"] ?? "");
-$email      = strtolower(trim($_POST["email"] ?? ""));
-$password   = trim($_POST["password"] ?? "");
+require_once __DIR__ . "/db.php"; // ✅ provides $conn
 
-/* validations */
-if ($first_name === "" || $last_name === "" || $email === "" || $password === "") {
-  echo json_encode(["success"=>false, "message"=>"empty fields"]);
+// ---------- PHPMailer ----------
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception;
+
+require __DIR__ . "/PHPMailer/src/Exception.php";
+require __DIR__ . "/PHPMailer/src/PHPMailer.php";
+require __DIR__ . "/PHPMailer/src/SMTP.php";
+
+// ---------- READ JSON ----------
+$raw = file_get_contents("php://input");
+$data = json_decode($raw, true);
+
+if (!is_array($data)) {
+  echo json_encode(["success" => false, "message" => "Invalid JSON input"]);
+  exit;
+}
+
+// ---------- ACCEPT BOTH key styles ----------
+$first = trim($data["first_name"] ?? $data["firstName"] ?? "");
+$last  = trim($data["last_name"]  ?? $data["lastName"]  ?? "");
+$email = trim($data["email"] ?? "");
+$tel   = trim($data["telephone"] ?? $data["phone"] ?? $data["tel"] ?? "");
+$role  = trim($data["role"] ?? "");
+$pass  = trim($data["password"] ?? "");
+
+// ---------- VALIDATION ----------
+if ($first === "" || $last === "" || $email === "" || $role === "" || $pass === "") {
+  echo json_encode(["success" => false, "message" => "Missing required fields"]);
   exit;
 }
 
 if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-  echo json_encode(["success"=>false, "message"=>"invalid email"]);
+  echo json_encode(["success" => false, "message" => "Invalid email address"]);
   exit;
 }
 
-/* exactly 6 digits */
-if (!preg_match('/^[0-9]{6}$/', $password)) {
-  echo json_encode(["success"=>false, "message"=>"password must be 6 digits"]);
+if (strlen($pass) != 6) {
+  echo json_encode(["success" => false, "message" => "Password must be exactly 6 characters"]);
   exit;
 }
 
-/* duplicate email check */
-$check = $conn->prepare("SELECT user_id FROM users WHERE email=?");
+// ---------- CHECK DB CONNECTION ----------
+if (!isset($conn) || $conn === null) {
+  echo json_encode(["success" => false, "message" => "DB connection is null. Check db.php"]);
+  exit;
+}
+
+// ---------- CHECK EMAIL EXISTS ----------
+$check = $conn->prepare("SELECT user_id FROM users WHERE email = ?");
+if (!$check) {
+  echo json_encode(["success" => false, "message" => "Prepare failed: " . $conn->error]);
+  exit;
+}
 $check->bind_param("s", $email);
 $check->execute();
 $check->store_result();
 
 if ($check->num_rows > 0) {
-  echo json_encode(["success"=>false, "message"=>"duplicate email"]);
+  echo json_encode(["success" => false, "message" => "Email already registered"]);
+  exit;
+}
+$check->close();
+
+// ---------- INSERT USER ----------
+$created = date("Y-m-d");
+
+$stmt = $conn->prepare("
+  INSERT INTO users (first_name, last_name, email, telephone, role, password, created_date)
+  VALUES (?, ?, ?, ?, ?, ?, ?)
+");
+if (!$stmt) {
+  echo json_encode(["success" => false, "message" => "Prepare failed: " . $conn->error]);
   exit;
 }
 
-/* generate new user_id (U001, U002...) */
-$getMax = $conn->query("SELECT user_id FROM users ORDER BY user_id DESC LIMIT 1");
-$nextId = "U001";
-if ($getMax && $getMax->num_rows > 0) {
-  $row = $getMax->fetch_assoc();
-  $num = intval(substr($row["user_id"], 1)) + 1;
-  $nextId = "U" . str_pad($num, 3, "0", STR_PAD_LEFT);
+$stmt->bind_param("sssssss", $first, $last, $email, $tel, $role, $pass, $created);
+
+if (!$stmt->execute()) {
+  echo json_encode(["success" => false, "message" => "Database error: " . $stmt->error]);
+  exit;
+}
+$stmt->close();
+
+// ---------- SEND EMAIL (does NOT block success) ----------
+try {
+  $mail = new PHPMailer(true);
+
+  $mail->isSMTP();
+  $mail->Host = "smtp.gmail.com";
+  $mail->SMTPAuth = true;
+
+  // ✅ your gmail
+  $mail->Username = "bugbustersapp@gmail.com";
+
+  // ✅ app password (NO SPACES)
+  $mail->Password = "lyjogpdujishxczp";
+
+  $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+  $mail->Port = 587;
+
+  $mail->setFrom("bugbustersapp@gmail.com", "Bug Busters App");
+  $mail->addAddress($email, $first);
+
+  $mail->isHTML(false);
+  $mail->Subject = "Bug Busters - Registration Successful";
+  $mail->Body =
+    "Hi $first,\n\n" .
+    "You have successfully registered the Bug Busters app.\n\n" .
+    "Bug Busters Team";
+
+  $mail->send();
+} catch (Exception $e) {
+  // ignore email errors so app still works
 }
 
-/* insert (PLAIN PASSWORD) */
-$stmt = $conn->prepare(
-  "INSERT INTO users (user_id, first_name, last_name, email, password)
-   VALUES (?,?,?,?,?)"
-);
-$stmt->bind_param("sssss", $nextId, $first_name, $last_name, $email, $password);
-
-if ($stmt->execute()) {
-  echo json_encode([
-    "success" => true,
-    "message" => "register success",
-    "user_id" => $nextId
-  ]);
-} else {
-  http_response_code(500);
-  echo json_encode([
-    "success"=>false,
-    "message"=>"register failed",
-    "sql_error"=>$conn->error
-  ]);
-}
-exit;
+// ---------- SUCCESS ----------
+echo json_encode([
+  "success" => true,
+  "message" => "Registration successful. Confirmation email sent."
+]);
