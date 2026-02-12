@@ -37,9 +37,9 @@ if (!is_array($data)) respond(false, "Invalid JSON");
 $user_id = intval($data["user_id"] ?? 0);
 if ($user_id <= 0) respond(false, "user_id required");
 
-$table = "pump"; // your table name
+$table = "pump";
 
-// ✅ Must have: pump_id, user_id, pump_name
+// pump table details
 $sql = "SELECT pump_id, pump_name FROM `$table` WHERE user_id = ? ORDER BY pump_id DESC";
 $stmt = $conn->prepare($sql);
 if (!$stmt) respond(false, "Prepare failed: " . $conn->error);

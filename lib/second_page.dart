@@ -51,7 +51,7 @@ class _SecondPageState extends State<SecondPage> {
       final result = await ApiService.login(email: email, password: password);
 
       if (result["success"] == true) {
-        // Expecting: result["user"] = { user_id, first_name, last_name, email, role, ... }
+        
         final user = result["user"];
 
         if (user == null) {
@@ -61,11 +61,11 @@ class _SecondPageState extends State<SecondPage> {
 
         final prefs = await SharedPreferences.getInstance();
 
-        // Save user_id as INT (important for pump dropdown filtering)
+        
         final int userId = int.tryParse(user["user_id"].toString()) ?? 0;
         await prefs.setInt("user_id", userId);
 
-        // Save profile info for Dashboard/Settings/Profile etc.
+      
         await prefs.setString("first_name", (user["first_name"] ?? "").toString());
         await prefs.setString("last_name", (user["last_name"] ?? "").toString());
         await prefs.setString("email", (user["email"] ?? "").toString());

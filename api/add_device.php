@@ -13,7 +13,7 @@ if ($user_name === "" || $device_name === "" || $device_id === "") {
   exit();
 }
 
-// Create table fields accordingly (see SQL below)
+// Create table fields
 $stmt = $conn->prepare("INSERT INTO devices (user_name, device_name, device_id) VALUES (?, ?, ?)");
 $stmt->bind_param("sss", $user_name, $device_name, $device_id);
 

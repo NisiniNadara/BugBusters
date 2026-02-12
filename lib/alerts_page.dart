@@ -18,9 +18,8 @@ class AlertsPage extends StatefulWidget {
 }
 
 class _AlertsPageState extends State<AlertsPage> {
-  // API alerts list (same structure used by UI)
+  // API alerts list
   List<Map<String, dynamic>> alerts = [];
-
   bool _loading = true;
 
   @override
@@ -35,7 +34,7 @@ class _AlertsPageState extends State<AlertsPage> {
       final sp = await SharedPreferences.getInstance();
       final userId = sp.getString("user_id");
 
-      if (userId == null) {
+      if (userId == null || userId.trim().isEmpty) {
         setState(() {
           alerts = [];
           _loading = false;
@@ -50,7 +49,7 @@ class _AlertsPageState extends State<AlertsPage> {
             .map((e) => Map<String, dynamic>.from(e as Map))
             .toList();
 
-        // Convert API fields -> your UI fields (title, time, active)
+        // Convert API fields (safe conversions)
         final converted = list.map((a) {
           final title = (a["title"] ?? "Alert").toString();
           final severity = (a["severity"] ?? "low").toString().toLowerCase();
@@ -59,9 +58,9 @@ class _AlertsPageState extends State<AlertsPage> {
           return {
             "title": title,
             "time": _formatTime(createdAt),
-            // active = true if high/medium (you can adjust)
+
             "active": severity == "high" || severity == "medium",
-            // extra fields for Day 6 UI details
+
             "severity": severity,
             "message": (a["message"] ?? "").toString(),
           };
@@ -83,7 +82,6 @@ class _AlertsPageState extends State<AlertsPage> {
         _loading = false;
       });
 
-      // show error message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Error loading alerts: $e")),
       );
@@ -95,12 +93,10 @@ class _AlertsPageState extends State<AlertsPage> {
   }
 
   String _formatTime(String ts) {
-    // API format: "YYYY-MM-DD HH:mm:ss"
     try {
       final dt = DateTime.parse(ts.replaceFirst(' ', 'T'));
       return DateFormat("yyyy-MM-dd  HH:mm").format(dt);
     } catch (_) {
-      // fallback
       return ts.isEmpty ? "Unknown time" : ts;
     }
   }
@@ -132,7 +128,7 @@ class _AlertsPageState extends State<AlertsPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ───────── Back Button ─────────
+            // Back Button
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
               child: InkWell(
@@ -154,7 +150,7 @@ class _AlertsPageState extends State<AlertsPage> {
             ),
             const SizedBox(height: 12),
 
-            // ───────── Title ─────────
+            // Title
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16),
               child: Text(
@@ -172,7 +168,7 @@ class _AlertsPageState extends State<AlertsPage> {
             ),
             const SizedBox(height: 6),
 
-            // ───────── Alerts List ─────────
+            // Alerts List
             Expanded(
               child: RefreshIndicator(
                 onRefresh: _refresh,
@@ -201,12 +197,14 @@ class _AlertsPageState extends State<AlertsPage> {
                             itemCount: alerts.length,
                             itemBuilder: (context, index) {
                               final alert = alerts[index];
+
+                              // ✅ SAFE conversions (prevents int->String crash)
                               return AlertItem(
-                                title: alert["title"],
-                                time: alert["time"],
-                                active: alert["active"],
-                                severity:
-                                    _severityLabel(alert["severity"] ?? "low"),
+                                title: (alert["title"] ?? "").toString(),
+                                time: (alert["time"] ?? "").toString(),
+                                active: alert["active"] == true,
+                                severity: _severityLabel(
+                                    (alert["severity"] ?? "low").toString()),
                                 message: (alert["message"] ?? "").toString(),
                                 onDelete: () => deleteAlert(index),
                               );
@@ -217,7 +215,7 @@ class _AlertsPageState extends State<AlertsPage> {
 
             const SizedBox(height: 20),
 
-            // ───────── Clear All Button ─────────
+            // Clear All Button
             Center(
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
@@ -245,19 +243,19 @@ class _AlertsPageState extends State<AlertsPage> {
         ),
       ),
 
-      // ───────── Bottom Navigation ─────────
+      // Bottom Navigation
       bottomNavigationBar: _BottomNavBar(),
     );
   }
 }
 
-// ───────── Alert Card ─────────
+// Alert Card
 class AlertItem extends StatelessWidget {
   final String title;
   final String time;
   final bool active;
-  final String severity; 
-  final String message; 
+  final String severity;
+  final String message;
   final VoidCallback onDelete;
 
   const AlertItem({
@@ -287,7 +285,6 @@ class AlertItem extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Title + Severity label (same style, just add text)
                 Row(
                   children: [
                     Expanded(
@@ -343,7 +340,7 @@ class AlertItem extends StatelessWidget {
   }
 }
 
-// ───────── Bottom Nav Bar ─────────
+// Bottom Nav Bar
 class _BottomNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -400,7 +397,7 @@ class _BottomNavBar extends StatelessWidget {
   }
 }
 
-// ───────── Bottom Nav Item ─────────
+// Bottom Nav Item
 class BottomNavItem extends StatelessWidget {
   final IconData icon;
   final String label;

@@ -1,9 +1,9 @@
 <?php
 header("Content-Type: application/json; charset=UTF-8");
 
-require_once __DIR__ . "/db.php"; // ✅ provides $conn
+require_once __DIR__ . "/db.php";
 
-// ---------- PHPMailer ----------
+// PHPMailer 
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 
@@ -11,7 +11,7 @@ require __DIR__ . "/PHPMailer/src/Exception.php";
 require __DIR__ . "/PHPMailer/src/PHPMailer.php";
 require __DIR__ . "/PHPMailer/src/SMTP.php";
 
-// ---------- READ JSON ----------
+//READ JSON 
 $raw = file_get_contents("php://input");
 $data = json_decode($raw, true);
 
@@ -20,7 +20,7 @@ if (!is_array($data)) {
   exit;
 }
 
-// ---------- ACCEPT BOTH key styles ----------
+
 $first = trim($data["first_name"] ?? $data["firstName"] ?? "");
 $last  = trim($data["last_name"]  ?? $data["lastName"]  ?? "");
 $email = trim($data["email"] ?? "");
@@ -28,7 +28,7 @@ $tel   = trim($data["telephone"] ?? $data["phone"] ?? $data["tel"] ?? "");
 $role  = trim($data["role"] ?? "");
 $pass  = trim($data["password"] ?? "");
 
-// ---------- VALIDATION ----------
+
 if ($first === "" || $last === "" || $email === "" || $role === "" || $pass === "") {
   echo json_encode(["success" => false, "message" => "Missing required fields"]);
   exit;
@@ -44,13 +44,9 @@ if (strlen($pass) != 6) {
   exit;
 }
 
-// ---------- CHECK DB CONNECTION ----------
-if (!isset($conn) || $conn === null) {
-  echo json_encode(["success" => false, "message" => "DB connection is null. Check db.php"]);
-  exit;
-}
 
-// ---------- CHECK EMAIL EXISTS ----------
+
+// CHECK EMAIL EXISTS
 $check = $conn->prepare("SELECT user_id FROM users WHERE email = ?");
 if (!$check) {
   echo json_encode(["success" => false, "message" => "Prepare failed: " . $conn->error]);
@@ -66,7 +62,7 @@ if ($check->num_rows > 0) {
 }
 $check->close();
 
-// ---------- INSERT USER ----------
+// INSERT USER
 $created = date("Y-m-d");
 
 $stmt = $conn->prepare("
@@ -86,7 +82,7 @@ if (!$stmt->execute()) {
 }
 $stmt->close();
 
-// ---------- SEND EMAIL (does NOT block success) ----------
+//SEND EMAIL
 try {
   $mail = new PHPMailer(true);
 
@@ -94,10 +90,10 @@ try {
   $mail->Host = "smtp.gmail.com";
   $mail->SMTPAuth = true;
 
-  // ✅ your gmail
+  
   $mail->Username = "bugbustersapp@gmail.com";
 
-  // ✅ app password (NO SPACES)
+  
   $mail->Password = "lyjogpdujishxczp";
 
   $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
@@ -115,10 +111,10 @@ try {
 
   $mail->send();
 } catch (Exception $e) {
-  // ignore email errors so app still works
+  
 }
 
-// ---------- SUCCESS ----------
+
 echo json_encode([
   "success" => true,
   "message" => "Registration successful. Confirmation email sent."

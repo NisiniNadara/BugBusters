@@ -28,7 +28,7 @@ class PumpHealthPage extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // 🔙 BACK BUTTON
+                    // BACK BUTTON
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 15, 16, 0),
                       child: GestureDetector(
@@ -129,7 +129,7 @@ class PumpHealthPage extends StatelessWidget {
         ),
       ),
 
-      // 🔹 BOTTOM NAV BAR
+      // BOTTOM NAV BAR
       bottomNavigationBar: _bottomBar(context),
     );
   }
@@ -199,9 +199,9 @@ class PumpHealthPage extends StatelessWidget {
   }
 }
 
-//////////////////////////////////////////////////////////////
+
 //  GAUGE METER
-//////////////////////////////////////////////////////////////
+
 
 class GaugeMeter extends StatelessWidget {
   const GaugeMeter({super.key});
@@ -247,9 +247,9 @@ class GaugeMeter extends StatelessWidget {
   }
 }
 
-//////////////////////////////////////////////////////////////
+
 // ARC PAINTER
-//////////////////////////////////////////////////////////////
+
 
 class ArcPainter extends CustomPainter {
   final double startAngle;
@@ -283,9 +283,9 @@ class ArcPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-//////////////////////////////////////////////////////////////
+
 // MINI GAUGE
-//////////////////////////////////////////////////////////////
+
 
 class MiniGauge extends StatelessWidget {
   final String label;
@@ -319,9 +319,9 @@ class MiniGauge extends StatelessWidget {
   }
 }
 
-//////////////////////////////////////////////////////////////
+
 //  BOTTOM ITEM
-//////////////////////////////////////////////////////////////
+
 
 class BottomItem extends StatelessWidget {
   final IconData icon;

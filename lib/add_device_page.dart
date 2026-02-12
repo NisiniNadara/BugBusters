@@ -33,7 +33,7 @@ class _AddDevicePageState extends State<AddDevicePage> {
     _firstNameCtrl.text = (prefs.getString("first_name") ?? "").trim();
     _emailCtrl.text = (prefs.getString("email") ?? "").trim();
 
-    // ✅ user_id load (int or string)
+    // user_id load
     _userId = prefs.getInt("user_id") ?? 0;
     if (_userId == 0) {
       _userId = int.tryParse(prefs.getString("user_id") ?? "") ?? 0;
@@ -72,12 +72,12 @@ class _AddDevicePageState extends State<AddDevicePage> {
     try {
       final url = Uri.parse("$baseUrl/add_pump.php");
 
-      // ✅ Backend එකට user_id + pump_name + location යවන්න
+      // send user_id + pump_name + location to backend
       final payload = {
         "user_id": _userId,
         "pump_name": deviceName,
         "location": location,
-        "pump_location": location, // optional (support both)
+        "pump_location": location, 
       };
 
       final res = await http

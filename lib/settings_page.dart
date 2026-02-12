@@ -34,14 +34,14 @@ class _SettingsPageState extends State<SettingsPage> {
   final emailController = TextEditingController();
   final roleController = TextEditingController();
 
-  // We need first/last separately for DB
+  
   String _firstName = "";
   String _lastName = "";
   int _userId = 0;
 
   String _avatarText = "U";
 
-  // API base url
+
   final String baseUrl = "http://10.0.2.2/flutter_application_2-main/api";
 
   // Pumps list
@@ -156,7 +156,7 @@ class _SettingsPageState extends State<SettingsPage> {
       }
 
       if (res.statusCode == 200 && data["success"] == true) {
-        // Update local prefs also
+        
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString("first_name", first);
         await prefs.setString("last_name", last);
@@ -430,7 +430,7 @@ class _SettingsPageState extends State<SettingsPage> {
                                       setState(() => isEditingProfile = true);
                                       return;
                                     }
-                                    // ✅ Save profile to backend
+                                    // Save profile to backend
                                     await _saveProfileToBackend();
                                   },
                             child: Text(
@@ -522,7 +522,7 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  // Role dropdown UI (fits inside same profile section)
+  // Role dropdown 
   Widget _roleDropdown() {
     return DropdownButtonHideUnderline(
       child: DropdownButton<String>(

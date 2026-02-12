@@ -1,6 +1,6 @@
 <?php
 header("Content-Type: application/json; charset=UTF-8");
-require_once __DIR__ . "/db.php"; // gives $conn (mysqli)
+require_once __DIR__ . "/db.php";
 
 $raw = file_get_contents("php://input");
 $data = json_decode($raw, true);
@@ -23,7 +23,7 @@ if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
   exit;
 }
 
-// users table password = CHAR(6) -> compare plain (your DB design)
+
 $stmt = $conn->prepare("SELECT user_id, first_name, last_name, email, telephone, role, password FROM users WHERE email = ? LIMIT 1");
 if (!$stmt) {
   echo json_encode(["success" => false, "message" => "Prepare failed: " . $conn->error]);
@@ -47,7 +47,7 @@ if ($user["password"] !== $password) {
   exit;
 }
 
-// success
+
 echo json_encode([
   "success" => true,
   "message" => "Login success",

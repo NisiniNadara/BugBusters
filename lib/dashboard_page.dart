@@ -36,7 +36,7 @@ class _DashboardPageState extends State<DashboardPage> {
         child: SingleChildScrollView(
           child: Column(
             children: [
-              // 🔹 TOP GREEN HEADER
+              //  TOP GREEN HEADER
               Container(
                 width: double.infinity,
                 height: 150,
@@ -183,12 +183,12 @@ class _DashboardPageState extends State<DashboardPage> {
         ),
       ),
 
-      // 🔹 BOTTOM NAV BAR
+      // BOTTOM NAV BAR
       bottomNavigationBar: _bottomBar(context),
     );
   }
 
-  // 🔹 BOTTOM BAR
+  // BOTTOM BAR
   Widget _bottomBar(BuildContext context) {
     return Container(
       height: 70,
@@ -251,7 +251,7 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 }
 
-// 🔹 STATUS BOX
+// STATUS BOX
 class StatusBox extends StatelessWidget {
   final String title;
   final String value;
@@ -300,7 +300,7 @@ class StatusBox extends StatelessWidget {
   }
 }
 
-// 🔹 BOTTOM ITEM
+// BOTTOM ITEM
 class BottomItem extends StatelessWidget {
   final IconData icon;
   final String label;
