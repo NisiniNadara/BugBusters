@@ -30,11 +30,16 @@ class _AlertsPageState extends State<AlertsPage> {
 
   Future<void> _loadAlerts() async {
     setState(() => _loading = true);
+
     try {
       final sp = await SharedPreferences.getInstance();
-      final userId = sp.getString("user_id");
 
-      if (userId == null || userId.trim().isEmpty) {
+      // ✅ FIX: user_id might be saved as INT, so getString() can crash.
+      // Read as dynamic and convert to String safely.
+      final dynamic rawUserId = sp.get("user_id");
+      final String userId = rawUserId?.toString() ?? "";
+
+      if (userId.trim().isEmpty) {
         setState(() {
           alerts = [];
           _loading = false;
@@ -46,6 +51,7 @@ class _AlertsPageState extends State<AlertsPage> {
 
       if (res["success"] == true && res["alerts"] is List) {
         final list = (res["alerts"] as List)
+            .where((e) => e is Map)
             .map((e) => Map<String, dynamic>.from(e as Map))
             .toList();
 
@@ -59,6 +65,7 @@ class _AlertsPageState extends State<AlertsPage> {
             "title": title,
             "time": _formatTime(createdAt),
 
+            // If you want active based on backend field, you can adjust later.
             "active": severity == "high" || severity == "medium",
 
             "severity": severity,
@@ -82,6 +89,7 @@ class _AlertsPageState extends State<AlertsPage> {
         _loading = false;
       });
 
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Error loading alerts: $e")),
       );
@@ -132,7 +140,10 @@ class _AlertsPageState extends State<AlertsPage> {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
               child: InkWell(
-                onTap: () => Navigator.pop(context),
+                onTap: () => Navigator.pushReplacement(
+  context,
+  MaterialPageRoute(builder: (_) => const DashboardPage()),
+),
                 child: Row(
                   children: const [
                     Icon(Icons.arrow_back, color: AlertsPage.darkGreen),
@@ -198,13 +209,13 @@ class _AlertsPageState extends State<AlertsPage> {
                             itemBuilder: (context, index) {
                               final alert = alerts[index];
 
-                              // ✅ SAFE conversions (prevents int->String crash)
                               return AlertItem(
                                 title: (alert["title"] ?? "").toString(),
                                 time: (alert["time"] ?? "").toString(),
                                 active: alert["active"] == true,
                                 severity: _severityLabel(
-                                    (alert["severity"] ?? "low").toString()),
+                                  (alert["severity"] ?? "low").toString(),
+                                ),
                                 message: (alert["message"] ?? "").toString(),
                                 onDelete: () => deleteAlert(index),
                               );
@@ -376,11 +387,14 @@ class _BottomNavBar extends StatelessWidget {
               );
             },
           ),
+
+          // ✅ CHANGED: use BottomNavItem + isActive true (white stroke)
           const BottomNavItem(
             icon: Icons.warning_amber_outlined,
             label: "Alerts",
-            active: true,
+            isActive: true,
           ),
+
           BottomNavItem(
             icon: Icons.settings,
             label: "Settings",
@@ -397,18 +411,18 @@ class _BottomNavBar extends StatelessWidget {
   }
 }
 
-// Bottom Nav Item
+// ✅ CHANGED: BottomNavItem now supports white-stroke circle when isActive==true
 class BottomNavItem extends StatelessWidget {
   final IconData icon;
   final String label;
-  final bool active;
+  final bool isActive;
   final VoidCallback? onTap;
 
   const BottomNavItem({
     super.key,
     required this.icon,
     required this.label,
-    this.active = false,
+    this.isActive = false,
     this.onTap,
   });
 
@@ -416,22 +430,37 @@ class BottomNavItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            icon,
-            color: active ? Colors.red : Colors.white,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              color: active ? Colors.red : Colors.white,
-              fontSize: 12,
+      child: Transform.translate(
+        offset: const Offset(0, -4),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: isActive ? 54 : 22,
+              height: isActive ? 54 : 22,
+              decoration: isActive
+                  ? BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AlertsPage.darkGreen,
+                      border: Border.all(color: Colors.white, width: 5),
+                    )
+                  : null,
+              child: Icon(
+                icon,
+                color: Colors.white,
+                size: isActive ? 22 : 20,
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                color: isActive ? Colors.red : Colors.white,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

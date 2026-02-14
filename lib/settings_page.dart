@@ -34,13 +34,11 @@ class _SettingsPageState extends State<SettingsPage> {
   final emailController = TextEditingController();
   final roleController = TextEditingController();
 
-  
   String _firstName = "";
   String _lastName = "";
   int _userId = 0;
 
   String _avatarText = "U";
-
 
   final String baseUrl = "http://10.0.2.2/flutter_application_2-main/api";
 
@@ -85,7 +83,8 @@ class _SettingsPageState extends State<SettingsPage> {
     final email = (prefs.getString("email") ?? "").trim();
     final role = (prefs.getString("role") ?? "").trim();
 
-    final fullName = [_firstName, _lastName].where((s) => s.isNotEmpty).join(" ").trim();
+    final fullName =
+        [_firstName, _lastName].where((s) => s.isNotEmpty).join(" ").trim();
 
     setState(() {
       nameController.text = fullName.isEmpty ? "User" : fullName;
@@ -105,7 +104,8 @@ class _SettingsPageState extends State<SettingsPage> {
   Future<void> _saveProfileToBackend() async {
     // Name controller contains "First Last"
     final fullName = nameController.text.trim();
-    final parts = fullName.split(RegExp(r"\s+")).where((e) => e.isNotEmpty).toList();
+    final parts =
+        fullName.split(RegExp(r"\s+")).where((e) => e.isNotEmpty).toList();
 
     if (parts.isEmpty) {
       _showSnack("Name required");
@@ -156,7 +156,6 @@ class _SettingsPageState extends State<SettingsPage> {
       }
 
       if (res.statusCode == 200 && data["success"] == true) {
-        
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString("first_name", first);
         await prefs.setString("last_name", last);
@@ -275,14 +274,16 @@ class _SettingsPageState extends State<SettingsPage> {
 
     showMenu<String>(
       context: context,
-      position: RelativeRect.fromLTRB(position.dx - 160, position.dy + 10, 16, 0),
+      position:
+          RelativeRect.fromLTRB(position.dx - 160, position.dy + 10, 16, 0),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       items: items,
     ).then((value) async {
       if (value == null) return;
 
       if (value == 'add_device') {
-        Navigator.push(context, MaterialPageRoute(builder: (_) => AddDevicePage()))
+        Navigator.push(
+                context, MaterialPageRoute(builder: (_) => AddDevicePage()))
             .then((_) => _loadPumpsForUser());
         return;
       }
@@ -328,7 +329,12 @@ class _SettingsPageState extends State<SettingsPage> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   InkWell(
-                    onTap: () => Navigator.pop(context),
+                    onTap: () {
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(builder: (_) => const DashboardPage()),
+                      );
+                    },
                     child: Row(
                       children: const [
                         Icon(Icons.arrow_back, color: darkGreen),
@@ -369,7 +375,8 @@ class _SettingsPageState extends State<SettingsPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text("Profile",
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 16)),
                         const SizedBox(height: 12),
                         Row(
                           children: [
@@ -379,7 +386,8 @@ class _SettingsPageState extends State<SettingsPage> {
                               child: Text(
                                 _avatarText,
                                 style: const TextStyle(
-                                    color: Colors.white, fontWeight: FontWeight.bold),
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold),
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -391,14 +399,17 @@ class _SettingsPageState extends State<SettingsPage> {
                                   isEditingProfile
                                       ? _editField(nameController, "Name")
                                       : Text(nameController.text,
-                                          style: const TextStyle(fontWeight: FontWeight.bold)),
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.bold)),
                                   const SizedBox(height: 2),
 
                                   // Email (editable)
                                   isEditingProfile
                                       ? _editField(emailController, "Email")
                                       : Text(emailController.text,
-                                          style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                                          style: const TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.black54)),
                                   const SizedBox(height: 4),
 
                                   // Role (dropdown when editing)
@@ -406,8 +417,11 @@ class _SettingsPageState extends State<SettingsPage> {
                                       ? _roleDropdown()
                                       : Chip(
                                           label: Text(roleController.text,
-                                              style: const TextStyle(fontSize: 11, color: darkGreen)),
-                                          backgroundColor: const Color(0xFFD6F5EC),
+                                              style: const TextStyle(
+                                                  fontSize: 11,
+                                                  color: darkGreen)),
+                                          backgroundColor:
+                                              const Color(0xFFD6F5EC),
                                         ),
                                 ],
                               ),
@@ -421,7 +435,8 @@ class _SettingsPageState extends State<SettingsPage> {
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.grey.shade200,
                               elevation: 0,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10)),
                             ),
                             onPressed: _savingProfile
                                 ? null
@@ -434,7 +449,11 @@ class _SettingsPageState extends State<SettingsPage> {
                                     await _saveProfileToBackend();
                                   },
                             child: Text(
-                              isEditingProfile ? (_savingProfile ? "Saving..." : "Save Profile") : "Edit Profile",
+                              isEditingProfile
+                                  ? (_savingProfile
+                                      ? "Saving..."
+                                      : "Save Profile")
+                                  : "Edit Profile",
                               style: const TextStyle(color: Colors.black),
                             ),
                           ),
@@ -449,7 +468,9 @@ class _SettingsPageState extends State<SettingsPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text("Notifications",
-                            style: TextStyle(color: darkGreen, fontWeight: FontWeight.bold)),
+                            style: TextStyle(
+                                color: darkGreen,
+                                fontWeight: FontWeight.bold)),
                         _switchTile(
                           title: "Push Notifications",
                           subtitle: "Receive notifications on your device",
@@ -472,12 +493,15 @@ class _SettingsPageState extends State<SettingsPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text("Account",
-                            style: TextStyle(color: darkGreen, fontWeight: FontWeight.bold)),
+                            style: TextStyle(
+                                color: darkGreen,
+                                fontWeight: FontWeight.bold)),
                         _arrowTile(
                           "Change Password",
                           onTap: () => Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (_) => const ChangePasswordPage()),
+                            MaterialPageRoute(
+                                builder: (_) => const ChangePasswordPage()),
                           ),
                         ),
                         _arrowTile("Terms of Service"),
@@ -492,7 +516,9 @@ class _SettingsPageState extends State<SettingsPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: const [
                         Text("About",
-                            style: TextStyle(color: darkGreen, fontWeight: FontWeight.bold)),
+                            style: TextStyle(
+                                color: darkGreen,
+                                fontWeight: FontWeight.bold)),
                         SizedBox(height: 6),
                         Text("Version : 1.0.0"),
                         Text("Developed by : Bug Busters Team"),
@@ -502,14 +528,17 @@ class _SettingsPageState extends State<SettingsPage> {
 
                   // Logout
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 32, vertical: 16),
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.orangeAccent,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30)),
                       ),
                       onPressed: _logout,
-                      child: const Text("Logout", style: TextStyle(color: Colors.red)),
+                      child:
+                          const Text("Logout", style: TextStyle(color: Colors.red)),
                     ),
                   ),
                 ],
@@ -522,7 +551,7 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  // Role dropdown 
+  // Role dropdown
   Widget _roleDropdown() {
     return DropdownButtonHideUnderline(
       child: DropdownButton<String>(
@@ -551,7 +580,9 @@ class _SettingsPageState extends State<SettingsPage> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 6)],
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 6)
+        ],
       ),
       child: child,
     );
@@ -594,7 +625,7 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 }
 
-// Bottom Navigation
+// Bottom Navigation (✅ UPDATED to show white-stroke circle when active)
 class _BottomNavBar extends StatelessWidget {
   const _BottomNavBar();
 
@@ -617,26 +648,53 @@ class _BottomNavBar extends StatelessWidget {
           _item(context, Icons.dashboard, "Dashboard", const DashboardPage()),
           _item(context, Icons.favorite, "Health", const PumpHealthPage()),
           _item(context, Icons.warning_amber_outlined, "Alerts", const AlertsPage()),
-          _item(context, Icons.settings, "Settings", null, active: true),
+          _item(context, Icons.settings, "Settings", null, active: true), // ✅ active
         ],
       ),
     );
   }
 
+  // ✅ UPDATED ITEM: draws same active circle + white stroke
   Widget _item(BuildContext context, IconData icon, String label, Widget? page,
       {bool active = false}) {
     return GestureDetector(
       onTap: page == null
           ? null
-          : () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => page)),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, color: active ? Colors.white : Colors.white70),
-          const SizedBox(height: 4),
-          Text(label,
-              style: TextStyle(fontSize: 12, color: active ? Colors.white : Colors.white70)),
-        ],
+          : () => Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (_) => page),
+              ),
+      child: Transform.translate(
+        offset: const Offset(0, -4),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: active ? 54 : 22,
+              height: active ? 54 : 22,
+              decoration: active
+                  ? BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: darkGreen,
+                      border: Border.all(color: Colors.white, width: 5), // ✅ white stroke
+                    )
+                  : null,
+              child: Icon(
+                icon,
+                color: Colors.white,
+                size: active ? 22 : 20,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                color: active ? Colors.white : Colors.white70,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

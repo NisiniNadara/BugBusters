@@ -1,4 +1,8 @@
+import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+
 import 'pump_health_page.dart';
 import 'alerts_page.dart';
 import 'settings_page.dart';
@@ -14,24 +18,147 @@ class DashboardPage extends StatefulWidget {
 class _DashboardPageState extends State<DashboardPage> {
   String firstName = "";
 
+  // ✅ dynamic sensor values
+  String temperatureText = "-- C";
+  String vibrationText = "-- mm/s";
+  String pressureText = "-- PSI";
+  String flowText = "-- %";
+
+  // ✅ NEW: RUL (changes once per 24 hours)
+  int rulDays = 45;
+
+  Timer? _timer;
+
+  // ✅ your base url
+  final String baseUrl = "http://10.0.2.2/flutter_application_2-main/api";
+
   @override
   void initState() {
     super.initState();
     _loadUserName();
+
+    // ✅ IMPORTANT: do NOT call backend on refresh/open
+    // just show last saved values
+    _loadFromPrefsOnly();
+
+    // ✅ NEW: load/update RUL only once per 24 hours
+    _loadOrUpdateRulOncePerDay();
+
+    // ✅ auto refresh every 1 minute (ONLY here values change)
+    _timer = Timer.periodic(const Duration(minutes: 1), (_) {
+      _fetchPumpStatus();
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadUserName() async {
     final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
     setState(() {
       firstName = prefs.getString("first_name") ?? "";
     });
+  }
+
+  // ✅ NEW: RUL changes ONLY once per 24 hours (dummy)
+  Future<void> _loadOrUpdateRulOncePerDay() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    final lastTimeMillis = prefs.getInt("latest_rul_time") ?? 0;
+    final savedRul = prefs.getInt("latest_rul") ?? 45;
+
+    final nowMillis = DateTime.now().millisecondsSinceEpoch;
+    const oneDayMillis = 24 * 60 * 60 * 1000;
+
+    if (lastTimeMillis == 0 || (nowMillis - lastTimeMillis) >= oneDayMillis) {
+      int newRul = savedRul - 1;
+      if (newRul < 0) newRul = 0;
+
+      await prefs.setInt("latest_rul", newRul);
+      await prefs.setInt("latest_rul_time", nowMillis);
+
+      if (!mounted) return;
+      setState(() => rulDays = newRul);
+    } else {
+      if (!mounted) return;
+      setState(() => rulDays = savedRul);
+    }
+  }
+
+  // ✅ load last saved values (no backend call)
+  Future<void> _loadFromPrefsOnly() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    final t = prefs.getDouble("latest_temp");
+    final v = prefs.getDouble("latest_vib");
+    final p = prefs.getDouble("latest_pressure");
+    final f = prefs.getDouble("latest_flow");
+
+    if (!mounted) return;
+
+    setState(() {
+      temperatureText = t == null ? "-- C" : "$t C";
+      vibrationText = v == null ? "-- mm/s" : "$v mm/s";
+      pressureText = p == null ? "-- PSI" : "$p PSI";
+      flowText = f == null ? "-- %" : "$f %";
+    });
+  }
+
+  Future<void> _fetchPumpStatus() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final dynamic rawUserId = prefs.get("user_id");
+      final String userId = rawUserId?.toString() ?? "";
+
+      final url = Uri.parse("$baseUrl/get_dashboard_status.php");
+
+      final res = await http.post(
+        url,
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"user_id": userId}),
+      );
+
+      final decoded = jsonDecode(res.body);
+
+      if (decoded["success"] == true && decoded["data"] is Map) {
+        final Map d = decoded["data"] as Map;
+
+        // ✅ parse safely
+        double toD(dynamic v) => double.tryParse(v?.toString() ?? "") ?? 0;
+
+        final temp = toD(d["temperature"]);
+        final vib = toD(d["vibration"]);
+        final pres = toD(d["pressure"]);
+        final flow = toD(d["flow_rate"]);
+
+        // ✅ SAVE for PumpHealthPage (same keys)
+        await prefs.setDouble("latest_temp", temp);
+        await prefs.setDouble("latest_vib", vib);
+        await prefs.setDouble("latest_pressure", pres);
+        await prefs.setDouble("latest_flow", flow);
+
+        if (!mounted) return;
+
+        setState(() {
+          temperatureText = "$temp C";
+          vibrationText = "$vib mm/s";
+          pressureText = "$pres PSI";
+          flowText = "$flow %";
+        });
+      }
+    } catch (_) {
+      // silent fail
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-
       body: SafeArea(
         child: SingleChildScrollView(
           child: Column(
@@ -75,8 +202,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 offset: const Offset(0, -30),
                 child: Container(
                   margin: const EdgeInsets.symmetric(horizontal: 36),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(18),
@@ -85,8 +211,8 @@ class _DashboardPageState extends State<DashboardPage> {
                     ],
                   ),
                   child: Column(
-                    children: const [
-                      Text(
+                    children: [
+                      const Text(
                         "Remaining useful Life\n(RUL)",
                         textAlign: TextAlign.center,
                         style: TextStyle(
@@ -95,18 +221,21 @@ class _DashboardPageState extends State<DashboardPage> {
                           color: Color(0xFF1A5319),
                         ),
                       ),
-                      SizedBox(height: 4),
-                      Divider(thickness: 1, indent: 40, endIndent: 40),
-                      SizedBox(height: 6),
+                      const SizedBox(height: 4),
+                      const Divider(thickness: 1, indent: 40, endIndent: 40),
+                      const SizedBox(height: 6),
+
+                      // ✅ CHANGED: show dummy RUL (updates once per 24h)
                       Text(
-                        "45",
-                        style: TextStyle(
+                        "$rulDays",
+                        style: const TextStyle(
                           fontSize: 72,
                           fontWeight: FontWeight.bold,
                           color: Colors.amber,
                         ),
                       ),
-                      Text(
+
+                      const Text(
                         "Days Remaining",
                         style: TextStyle(fontSize: 12),
                       ),
@@ -117,11 +246,10 @@ class _DashboardPageState extends State<DashboardPage> {
 
               const SizedBox(height: 6),
 
-              //  PUMP HEALTH STATUS
+              //  PUMP HEALTH STATUS (✅ now dynamic)
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 24),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(20),
@@ -134,22 +262,21 @@ class _DashboardPageState extends State<DashboardPage> {
                   children: [
                     const Text(
                       "Pump Health Status",
-                      style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 10),
                     Row(
-                      children: const [
+                      children: [
                         StatusBox(
                           title: "Temperature",
-                          value: "68 C",
+                          value: temperatureText,
                           icon: Icons.thermostat,
                           borderColor: Colors.red,
                         ),
-                        SizedBox(width: 12),
+                        const SizedBox(width: 12),
                         StatusBox(
                           title: "Vibration",
-                          value: "3.2 mm/s",
+                          value: vibrationText,
                           icon: Icons.waves,
                           borderColor: Colors.lightGreen,
                         ),
@@ -157,17 +284,17 @@ class _DashboardPageState extends State<DashboardPage> {
                     ),
                     const SizedBox(height: 12),
                     Row(
-                      children: const [
+                      children: [
                         StatusBox(
                           title: "Pressure",
-                          value: "42 PSI",
+                          value: pressureText,
                           icon: Icons.speed,
                           borderColor: Colors.lightGreen,
                         ),
-                        SizedBox(width: 12),
+                        const SizedBox(width: 12),
                         StatusBox(
                           title: "Flow Rate",
-                          value: "85 %",
+                          value: flowText,
                           icon: Icons.show_chart,
                           borderColor: Colors.amber,
                         ),
@@ -182,13 +309,11 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
         ),
       ),
-
-      // BOTTOM NAV BAR
       bottomNavigationBar: _bottomBar(context),
     );
   }
 
-  // BOTTOM BAR
+  // BOTTOM BAR (unchanged)
   Widget _bottomBar(BuildContext context) {
     return Container(
       height: 70,
@@ -202,15 +327,12 @@ class _DashboardPageState extends State<DashboardPage> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          // DASHBOARD
           BottomItem(
             icon: Icons.dashboard,
             label: "Dashboard",
             isActive: true,
             onTap: () {},
           ),
-
-          // HEALTH
           BottomItem(
             icon: Icons.favorite_border,
             label: "Health",
@@ -221,25 +343,21 @@ class _DashboardPageState extends State<DashboardPage> {
               );
             },
           ),
-
-          // ALERTS
           BottomItem(
             icon: Icons.warning_amber_outlined,
             label: "Alerts",
             onTap: () {
-              Navigator.push(
+              Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(builder: (_) => const AlertsPage()),
               );
             },
           ),
-
-          // SETTINGS
           BottomItem(
             icon: Icons.settings,
             label: "Settings",
             onTap: () {
-              Navigator.push(
+              Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(builder: (_) => const SettingsPage()),
               );
@@ -251,7 +369,7 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 }
 
-// STATUS BOX
+// STATUS BOX (same as yours)
 class StatusBox extends StatelessWidget {
   final String title;
   final String value;
@@ -300,7 +418,7 @@ class StatusBox extends StatelessWidget {
   }
 }
 
-// BOTTOM ITEM
+// BottomItem (unchanged)
 class BottomItem extends StatelessWidget {
   final IconData icon;
   final String label;

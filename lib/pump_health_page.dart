@@ -1,10 +1,161 @@
+import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+
 import 'dashboard_page.dart';
 import 'alerts_page.dart';
-import 'settings_page.dart'; 
+import 'settings_page.dart';
 
-class PumpHealthPage extends StatelessWidget {
+class PumpHealthPage extends StatefulWidget {
   const PumpHealthPage({super.key});
+
+  @override
+  State<PumpHealthPage> createState() => _PumpHealthPageState();
+}
+
+class _PumpHealthPageState extends State<PumpHealthPage> {
+  double temp = 0;
+  double vib = 0;
+  double pressure = 0;
+  double flow = 0;
+
+  Timer? _timer;
+
+  // ✅ same backend url as dashboard
+  final String baseUrl = "http://10.0.2.2/flutter_application_2-main/api";
+
+  @override
+  void initState() {
+    super.initState();
+
+    // ✅ DO NOT fetch on open (prevents changing values on refresh)
+    _loadFromPrefsOnly();
+
+    // ✅ refresh ONLY every 60 seconds
+    _timer = Timer.periodic(const Duration(seconds: 60), (_) {
+      _fetchAndSync();
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  // ✅ fetch from backend dummy data + save to prefs + update UI
+  Future<void> _fetchAndSync() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final dynamic rawUserId = prefs.get("user_id");
+      final String userId = rawUserId?.toString() ?? "";
+
+      final url = Uri.parse("$baseUrl/get_dashboard_status.php");
+
+      final res = await http.post(
+        url,
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"user_id": userId}),
+      );
+
+      final decoded = jsonDecode(res.body);
+
+      if (decoded["success"] == true && decoded["data"] is Map) {
+        final Map d = decoded["data"] as Map;
+
+        double toD(dynamic v) => double.tryParse(v?.toString() ?? "") ?? 0;
+
+        final newTemp = toD(d["temperature"]);
+        final newVib = toD(d["vibration"]);
+        final newPressure = toD(d["pressure"]);
+        final newFlow = toD(d["flow_rate"]);
+
+        // ✅ save same keys so Dashboard + Health both match
+        await prefs.setDouble("latest_temp", newTemp);
+        await prefs.setDouble("latest_vib", newVib);
+        await prefs.setDouble("latest_pressure", newPressure);
+        await prefs.setDouble("latest_flow", newFlow);
+
+        if (!mounted) return;
+
+        setState(() {
+          temp = newTemp;
+          vib = newVib;
+          pressure = newPressure;
+          flow = newFlow;
+        });
+      } else {
+        await _loadFromPrefsOnly();
+      }
+    } catch (_) {
+      await _loadFromPrefsOnly();
+    }
+  }
+
+  // ✅ fallback if backend fails (also used on page open)
+  Future<void> _loadFromPrefsOnly() async {
+    final prefs = await SharedPreferences.getInstance();
+    final newTemp = prefs.getDouble("latest_temp") ?? 0;
+    final newVib = prefs.getDouble("latest_vib") ?? 0;
+    final newPressure = prefs.getDouble("latest_pressure") ?? 0;
+    final newFlow = prefs.getDouble("latest_flow") ?? 0;
+
+    if (!mounted) return;
+    setState(() {
+      temp = newTemp;
+      vib = newVib;
+      pressure = newPressure;
+      flow = newFlow;
+    });
+  }
+
+  double _progress(double value, double max) {
+    if (max <= 0) return 0;
+    final p = value / max;
+    if (p < 0) return 0;
+    if (p > 1) return 1;
+    return p;
+  }
+
+  Widget _sensorBar({
+    required String title,
+    required String valueText,
+    required double progress,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8), // ✅ slightly tighter
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                ),
+              ),
+              Text(
+                valueText,
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6), // ✅ tighter
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: LinearProgressIndicator(
+              minHeight: 12,
+              value: progress,
+              backgroundColor: Colors.grey.shade300,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -12,124 +163,122 @@ class PumpHealthPage extends StatelessWidget {
       backgroundColor: Colors.white,
 
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              //  TOP CURVED HEADER
-              Container(
-                height: 230,
-                width: double.infinity,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF1A5319),
-                  borderRadius: BorderRadius.only(
-                    bottomRight: Radius.circular(150),
-                  ),
+        // ✅ CHANGED: remove SingleChildScrollView so page won't scroll
+        child: Column(
+          children: [
+            // TOP CURVED HEADER (fixed height)
+            Container(
+              height: 230,
+              width: double.infinity,
+              decoration: const BoxDecoration(
+                color: Color(0xFF1A5319),
+                borderRadius: BorderRadius.only(
+                  bottomRight: Radius.circular(150),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // BACK BUTTON
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 15, 16, 0),
-                      child: GestureDetector(
-                        onTap: () {
-                          Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const DashboardPage(),
-                            ),
-                          );
-                        },
-                        child: Row(
-                          children: const [
-                            Icon(Icons.arrow_back, color: Colors.white),
-                            SizedBox(width: 6),
-                            Text(
-                              "Back",
-                              style: TextStyle(color: Colors.white),
-                            ),
-                          ],
-                        ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // BACK BUTTON
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 15, 16, 0),
+                    child: GestureDetector(
+                      onTap: () {
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(builder: (_) => const DashboardPage()),
+                        );
+                      },
+                      child: Row(
+                        children: const [
+                          Icon(Icons.arrow_back, color: Colors.white),
+                          SizedBox(width: 6),
+                          Text("Back", style: TextStyle(color: Colors.white)),
+                        ],
                       ),
                     ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Center(
+                    child: Text(
+                      "Pump Health Monitor",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  const Center(child: GaugeMeter()),
+                ],
+              ),
+            ),
 
-                    const SizedBox(height: 8),
+            // ✅ CHANGED: everything below fits in remaining space
+            Expanded(
+              child: Column(
+                children: [
+                  const SizedBox(height: 14),
 
-                    const Center(
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 20),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
                       child: Text(
-                        "Pump Health Monitor",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        "RUL Time for this Month",
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                       ),
                     ),
+                  ),
 
-                    const SizedBox(height: 14),
-                    const Center(child: GaugeMeter()),
-                  ],
-                ),
-              ),
+                  const SizedBox(height: 10),
 
-              const SizedBox(height: 20),
-
-              // RUL TITLE
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 20),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    "RUL Time for this Month",
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+                  // ✅ CHANGED: reduce chart height so bars fit without scroll
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 20),
+                    height: 160,
+                    decoration: BoxDecoration(
+                      color: Colors.black,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Center(
+                      child: Text("Line Chart Here", style: TextStyle(color: Colors.white54)),
                     ),
                   ),
-                ),
-              ),
 
-              const SizedBox(height: 12),
+                  const SizedBox(height: 10),
 
-              //  LINE CHART PLACEHOLDER
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 20),
-                height: 200,
-                decoration: BoxDecoration(
-                  color: Colors.black,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Center(
-                  child: Text(
-                    "Line Chart Here",
-                    style: TextStyle(color: Colors.white54),
+                  // ✅ PROGRESS BARS
+                  _sensorBar(
+                    title: "Temperature",
+                    valueText: temp == 0 ? "--" : "${temp.toStringAsFixed(1)} C",
+                    progress: _progress(temp, 100),
                   ),
-                ),
+                  _sensorBar(
+                    title: "Vibration",
+                    valueText: vib == 0 ? "--" : "${vib.toStringAsFixed(1)} mm/s",
+                    progress: _progress(vib, 5),
+                  ),
+                  _sensorBar(
+                    title: "Pressure",
+                    valueText: pressure == 0 ? "--" : "${pressure.toStringAsFixed(0)} PSI",
+                    progress: _progress(pressure, 100),
+                  ),
+                  _sensorBar(
+                    title: "Flow Rate",
+                    valueText: flow == 0 ? "--" : "${flow.toStringAsFixed(0)} %",
+                    progress: _progress(flow, 100),
+                  ),
+
+                  const Spacer(), // ✅ keeps spacing stable without scroll
+                ],
               ),
-
-              const SizedBox(height: 20),
-
-              //  MINI GAUGES
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 30, 16, 30),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: const [
-                    MiniGauge(label: "Temperature", color: Colors.red),
-                    MiniGauge(label: "Vibration", color: Colors.green),
-                    MiniGauge(label: "Pressure", color: Colors.amber),
-                    MiniGauge(label: "Flow Rate", color: Colors.green),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 90),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
 
-      // BOTTOM NAV BAR
       bottomNavigationBar: _bottomBar(context),
     );
   }
@@ -147,7 +296,6 @@ class PumpHealthPage extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          // Dashboard
           BottomItem(
             icon: Icons.dashboard,
             label: "Dashboard",
@@ -158,38 +306,28 @@ class PumpHealthPage extends StatelessWidget {
               );
             },
           ),
-
-          // Health (ACTIVE)
           const BottomItem(
             icon: Icons.favorite,
             label: "Health",
             isActive: true,
           ),
-
-          // Alerts
           BottomItem(
             icon: Icons.warning_amber_outlined,
             label: "Alerts",
             onTap: () {
-              Navigator.push(
+              Navigator.pushReplacement(
                 context,
-                MaterialPageRoute(
-                  builder: (_) => const AlertsPage(),
-                ),
+                MaterialPageRoute(builder: (_) => const AlertsPage()),
               );
             },
           ),
-
-          // SETTINGS (FIXED)
           BottomItem(
             icon: Icons.settings,
             label: "Settings",
             onTap: () {
-              Navigator.push(
+              Navigator.pushReplacement(
                 context,
-                MaterialPageRoute(
-                  builder: (_) => const SettingsPage(),
-                ),
+                MaterialPageRoute(builder: (_) => const SettingsPage()),
               );
             },
           ),
@@ -199,10 +337,7 @@ class PumpHealthPage extends StatelessWidget {
   }
 }
 
-
-//  GAUGE METER
-
-
+// GAUGE METER
 class GaugeMeter extends StatelessWidget {
   const GaugeMeter({super.key});
 
@@ -216,19 +351,11 @@ class GaugeMeter extends StatelessWidget {
         children: [
           CustomPaint(
             size: const Size(180, 80),
-            painter: ArcPainter(
-              startAngle: 3.14,
-              sweepAngle: 2.1,
-              color: Colors.yellow,
-            ),
+            painter: ArcPainter(startAngle: 3.14, sweepAngle: 2.1, color: Colors.yellow),
           ),
           CustomPaint(
             size: const Size(180, 80),
-            painter: ArcPainter(
-              startAngle: 5.3,
-              sweepAngle: 1.1,
-              color: Colors.white70,
-            ),
+            painter: ArcPainter(startAngle: 5.3, sweepAngle: 1.1, color: Colors.white70),
           ),
           Transform.rotate(
             angle: -0.5,
@@ -246,10 +373,6 @@ class GaugeMeter extends StatelessWidget {
     );
   }
 }
-
-
-// ARC PAINTER
-
 
 class ArcPainter extends CustomPainter {
   final double startAngle;
@@ -283,46 +406,7 @@ class ArcPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-
-// MINI GAUGE
-
-
-class MiniGauge extends StatelessWidget {
-  final String label;
-  final Color color;
-
-  const MiniGauge({
-    super.key,
-    required this.label,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        SizedBox(
-          width: 50,
-          height: 18,
-          child: CustomPaint(
-            painter: ArcPainter(
-              startAngle: 3.14,
-              sweepAngle: 2,
-              color: color,
-            ),
-          ),
-        ),
-        const SizedBox(height: 20),
-        Text(label, style: const TextStyle(fontSize: 10)),
-      ],
-    );
-  }
-}
-
-
-//  BOTTOM ITEM
-
-
+// BOTTOM ITEM
 class BottomItem extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -365,11 +449,7 @@ class BottomItem extends StatelessWidget {
             const SizedBox(height: 2),
             Text(
               label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 11,
-                height: 1.0,
-              ),
+              style: const TextStyle(color: Colors.white, fontSize: 11, height: 1.0),
             ),
           ],
         ),
