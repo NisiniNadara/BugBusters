@@ -2,55 +2,58 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class ApiService {
-  // ✅ Emulator base URL (XAMPP)
   static const String baseUrl =
-      "http://10.0.2.2/flutter_application_2-main/api";
+  "http://192.168.109.136/flutter_application_2-main/api";
 
-  // ---------- CORE POST (JSON) ----------
+  // ---------- CORE POST ----------
   static Future<Map<String, dynamic>> _post(
     String endpoint,
     Map<String, dynamic> body,
   ) async {
     final uri = Uri.parse("$baseUrl/$endpoint");
 
-    http.Response response;
     try {
-      response = await http.post(
+      final res = await http.post(
         uri,
         headers: {"Content-Type": "application/json; charset=UTF-8"},
         body: jsonEncode(body),
       );
+
+      final raw = res.body.trim();
+      if (raw.isEmpty) {
+        return {"success": false, "alerts": [], "message": "Empty response"};
+      }
+
+      return jsonDecode(raw);
     } catch (e) {
-      return {"success": false, "message": "Network error: $e"};
-    }
-
-    final raw = response.body.toString().trim();
-
-    if (raw.isEmpty) {
-      return {"success": false, "message": "Empty response from server"};
-    }
-
-    try {
-      final decoded = jsonDecode(raw);
-      if (decoded is Map<String, dynamic>) return decoded;
-
       return {
         "success": false,
-        "message": "Server returned JSON but not an object",
-        "raw": raw
-      };
-    } catch (_) {
-      final short = raw.length > 300 ? raw.substring(0, 300) : raw;
-      return {
-        "success": false,
-        "message":
-            "Server did not return JSON. HTTP ${response.statusCode}. $short",
-        "raw": raw
+        "alerts": [],
+        "message": "Network / JSON error: $e"
       };
     }
   }
 
-  // ---------- REGISTER ----------
+  // FETCH ALERTS 
+  static Future<Map<String, dynamic>> fetchAlerts({
+    required dynamic userId,
+  }) async {
+    final int uid = int.tryParse(userId.toString()) ?? 0;
+    return _post("fetch_alerts.php", {"user_id": uid});
+  }
+
+  //LOGIN
+  static Future<Map<String, dynamic>> login({
+    required String email,
+    required String password,
+  }) async {
+    return _post("login.php", {
+      "email": email,
+      "password": password,
+    });
+  }
+
+  // REGISTER 
   static Future<Map<String, dynamic>> register({
     required String firstName,
     required String lastName,
@@ -69,27 +72,7 @@ class ApiService {
     });
   }
 
-  // ---------- LOGIN ----------
-  static Future<Map<String, dynamic>> login({
-    required String email,
-    required String password,
-  }) async {
-    return _post("login.php", {
-      "email": email,
-      "password": password,
-    });
-  }
-
-  // ---------- FETCH ALERTS ----------
-  // expects backend fetch_alerts.php to read JSON: {"user_id": 1}
-  static Future<Map<String, dynamic>> fetchAlerts({
-    required dynamic userId,
-  }) async {
-    final intId = int.tryParse(userId.toString()) ?? 0;
-    return _post("fetch_alerts.php", {"user_id": intId});
-  }
-
-  // ---------- ADD PUMP ----------
+  // ADD PUMP 
   static Future<Map<String, dynamic>> addPump({
     required String email,
     required String pumpName,
@@ -102,7 +85,7 @@ class ApiService {
     });
   }
 
-  // ---------- CHANGE PASSWORD ----------
+  // CHANGE PASSWORD
   static Future<Map<String, dynamic>> changePassword({
     required String email,
     required String newPassword,
@@ -112,4 +95,4 @@ class ApiService {
       "new_password": newPassword,
     });
   }
-}                                    
+}

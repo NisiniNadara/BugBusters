@@ -1,8 +1,12 @@
 <?php
 header('Content-Type: application/json; charset=utf-8');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Methods: POST, OPTIONS');
+
 require_once __DIR__ . "/db.php";
 
-// Flutter sends JSON
+//  Read JSON 
 $raw = file_get_contents("php://input");
 $data = json_decode($raw, true);
 
@@ -13,60 +17,51 @@ if (!is_array($data)) {
 
 $user_id = intval($data["user_id"] ?? 0);
 if ($user_id <= 0) {
-  echo json_encode(["success" => false, "message" => "no user", "alerts" => []]);
+  echo json_encode(["success" => false, "message" => "Invalid user_id", "alerts" => []]);
   exit;
 }
 
-/*
-Schema:
-users(user_id) -> pump(user_id) -> pump_status(pump_id)
 
-We use pump_status as "alerts"
-*/
 $sql = "
   SELECT
-    ps.status_id,
-    ps.pump_id,
+    a.alert_id,
+    a.pump_id,
     p.pump_name,
-    ps.status,
-    ps.update_date
-  FROM pump_status ps
-  INNER JOIN pump p ON p.pump_id = ps.pump_id
+    a.alert_type,
+    a.severity,
+    a.message,
+    a.alert_date
+  FROM alert a
+  INNER JOIN pump p ON p.pump_id = a.pump_id
   WHERE p.user_id = ?
-  ORDER BY ps.update_date DESC
+  ORDER BY a.alert_date DESC
   LIMIT 200
 ";
 
-$q = $conn->prepare($sql);
-if (!$q) {
+$stmt = $conn->prepare($sql);
+if (!$stmt) {
   http_response_code(500);
-  echo json_encode(["success" => false, "message" => "SQL prepare failed (pump_status alerts)", "alerts" => []]);
+  echo json_encode(["success" => false, "message" => "SQL prepare failed: " . $conn->error, "alerts" => []]);
   exit;
 }
 
-$q->bind_param("i", $user_id);
-$q->execute();
-$res = $q->get_result();
+$stmt->bind_param("i", $user_id);
+
+if (!$stmt->execute()) {
+  http_response_code(500);
+  echo json_encode(["success" => false, "message" => "SQL execute failed: " . $stmt->error, "alerts" => []]);
+  exit;
+}
+
+$res = $stmt->get_result();
 
 $alerts = [];
 while ($row = $res->fetch_assoc()) {
-  $status = strtolower((string)$row["status"]);
-
-  // ✅ severity rule (edit if you want)
-  $severity = "low";
-  if (strpos($status, "fail") !== false || strpos($status, "error") !== false || strpos($status, "offline") !== false) {
-    $severity = "high";
-  } elseif (strpos($status, "warn") !== false || strpos($status, "abnormal") !== false) {
-    $severity = "medium";
-  }
-
   $alerts[] = [
-    "id"         => (string)$row["status_id"],
-    "pump_id"    => (string)$row["pump_id"],
-    "title"      => "Pump " . (string)$row["pump_name"],
-    "message"    => "Status: " . (string)$row["status"],
-    "severity"   => (string)$severity,
-    "created_at" => (string)$row["update_date"],
+    "title"      => (string)($row["alert_type"] . " - " . $row["pump_name"]), 
+    "severity"   => strtolower((string)$row["severity"]),                    
+    "message"    => (string)$row["message"],
+    "created_at" => (string)$row["alert_date"],                              
   ];
 }
 

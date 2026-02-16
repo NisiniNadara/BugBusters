@@ -19,7 +19,7 @@ class _AddDevicePageState extends State<AddDevicePage> {
   int _userId = 0;
   bool _isLoading = false;
 
-  final String baseUrl = "http://10.0.2.2/flutter_application_2-main/api";
+  final String baseUrl = "http://192.168.109.136/flutter_application_2-main/api";
 
   @override
   void initState() {

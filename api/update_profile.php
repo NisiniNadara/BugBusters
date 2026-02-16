@@ -4,7 +4,7 @@ header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Headers: Content-Type");
 header("Access-Control-Allow-Methods: POST");
 
-// Remove ANY accidental output (warnings/echo/HTML) so response is ALWAYS JSON
+
 ob_start();
 
 require_once __DIR__ . "/db.php";
@@ -15,12 +15,12 @@ function respond($success, $message, $extra = []) {
   exit;
 }
 
-// Convert warnings/notices to JSON (so Flutter never gets HTML)
+
 set_error_handler(function ($severity, $message, $file, $line) {
   respond(false, "PHP warning: $message (line $line)");
 });
 
-// Convert fatal errors to JSON
+
 register_shutdown_function(function () {
   $e = error_get_last();
   if ($e && in_array($e["type"], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
@@ -63,14 +63,14 @@ function pickCol(array $cols, array $cands): ?string {
   return null;
 }
 
-// Read JSON input
+
 $raw = file_get_contents("php://input");
 if ($raw === false || trim($raw) === "") respond(false, "Empty request body");
 
 $data = json_decode($raw, true);
 if (!is_array($data)) respond(false, "Invalid JSON");
 
-// Payload from your Flutter code:
+
 $user_id   = intval($data["user_id"] ?? 0);
 $first     = trim($data["first_name"] ?? "");
 $last      = trim($data["last_name"] ?? "");
@@ -92,7 +92,7 @@ if ($usersTable === null) {
 $cols = getCols($conn, $usersTable);
 if (empty($cols)) respond(false, "Cannot read columns from '$usersTable'");
 
-// Detect columns (support different DB naming)
+// Detect columns 
 $idCol    = pickCol($cols, ["user_id", "id", "uid"]);
 $fnCol    = pickCol($cols, ["first_name", "firstname", "fname", "name"]);
 $lnCol    = pickCol($cols, ["last_name", "lastname", "lname", "surname"]);
@@ -104,7 +104,7 @@ if ($emailCol === null) respond(false, "Email column not found in '$usersTable'"
 if ($fnCol === null) respond(false, "First name column not found in '$usersTable'");
 if ($roleCol === null) respond(false, "Role column not found in '$usersTable'");
 
-// Build UPDATE query (last_name optional if column exists)
+
 $set = [];
 $params = [];
 $types = "";

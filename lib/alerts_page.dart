@@ -18,7 +18,6 @@ class AlertsPage extends StatefulWidget {
 }
 
 class _AlertsPageState extends State<AlertsPage> {
-  // API alerts list
   List<Map<String, dynamic>> alerts = [];
   bool _loading = true;
 
@@ -34,8 +33,7 @@ class _AlertsPageState extends State<AlertsPage> {
     try {
       final sp = await SharedPreferences.getInstance();
 
-      // ✅ FIX: user_id might be saved as INT, so getString() can crash.
-      // Read as dynamic and convert to String safely.
+      
       final dynamic rawUserId = sp.get("user_id");
       final String userId = rawUserId?.toString() ?? "";
 
@@ -55,19 +53,17 @@ class _AlertsPageState extends State<AlertsPage> {
             .map((e) => Map<String, dynamic>.from(e as Map))
             .toList();
 
-        // Convert API fields (safe conversions)
+        
         final converted = list.map((a) {
-          final title = (a["title"] ?? "Alert").toString();
+          final title = (a["title"] ?? a["alert_type"] ?? "Alert").toString();
           final severity = (a["severity"] ?? "low").toString().toLowerCase();
-          final createdAt = (a["created_at"] ?? "").toString();
+          final createdAt =
+              (a["created_at"] ?? a["alert_date"] ?? "").toString();
 
           return {
             "title": title,
             "time": _formatTime(createdAt),
-
-            // If you want active based on backend field, you can adjust later.
             "active": severity == "high" || severity == "medium",
-
             "severity": severity,
             "message": (a["message"] ?? "").toString(),
           };
@@ -82,6 +78,12 @@ class _AlertsPageState extends State<AlertsPage> {
           alerts = [];
           _loading = false;
         });
+
+        if (!mounted) return;
+        final msg = (res["message"] ?? "Failed to load alerts").toString();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(msg)),
+        );
       }
     } catch (e) {
       setState(() {
@@ -141,9 +143,9 @@ class _AlertsPageState extends State<AlertsPage> {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
               child: InkWell(
                 onTap: () => Navigator.pushReplacement(
-  context,
-  MaterialPageRoute(builder: (_) => const DashboardPage()),
-),
+                  context,
+                  MaterialPageRoute(builder: (_) => const DashboardPage()),
+                ),
                 child: Row(
                   children: const [
                     Icon(Icons.arrow_back, color: AlertsPage.darkGreen),
@@ -387,14 +389,11 @@ class _BottomNavBar extends StatelessWidget {
               );
             },
           ),
-
-          // ✅ CHANGED: use BottomNavItem + isActive true (white stroke)
           const BottomNavItem(
             icon: Icons.warning_amber_outlined,
             label: "Alerts",
             isActive: true,
           ),
-
           BottomNavItem(
             icon: Icons.settings,
             label: "Settings",
@@ -411,7 +410,6 @@ class _BottomNavBar extends StatelessWidget {
   }
 }
 
-// ✅ CHANGED: BottomNavItem now supports white-stroke circle when isActive==true
 class BottomNavItem extends StatelessWidget {
   final IconData icon;
   final String label;

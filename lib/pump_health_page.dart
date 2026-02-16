@@ -1,7 +1,5 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'dashboard_page.dart';
@@ -21,80 +19,27 @@ class _PumpHealthPageState extends State<PumpHealthPage> {
   double pressure = 0;
   double flow = 0;
 
-  Timer? _timer;
-
-  // ✅ same backend url as dashboard
-  final String baseUrl = "http://10.0.2.2/flutter_application_2-main/api";
+  Timer? _uiTimer;
 
   @override
   void initState() {
     super.initState();
 
-    // ✅ DO NOT fetch on open (prevents changing values on refresh)
+    //show saved values
     _loadFromPrefsOnly();
 
-    // ✅ refresh ONLY every 60 seconds
-    _timer = Timer.periodic(const Duration(seconds: 60), (_) {
-      _fetchAndSync();
+    // refresh UI only every 60 seconds
+    _uiTimer = Timer.periodic(const Duration(seconds: 60), (_) {
+      _loadFromPrefsOnly();
     });
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _uiTimer?.cancel();
     super.dispose();
   }
 
-  // ✅ fetch from backend dummy data + save to prefs + update UI
-  Future<void> _fetchAndSync() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final dynamic rawUserId = prefs.get("user_id");
-      final String userId = rawUserId?.toString() ?? "";
-
-      final url = Uri.parse("$baseUrl/get_dashboard_status.php");
-
-      final res = await http.post(
-        url,
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({"user_id": userId}),
-      );
-
-      final decoded = jsonDecode(res.body);
-
-      if (decoded["success"] == true && decoded["data"] is Map) {
-        final Map d = decoded["data"] as Map;
-
-        double toD(dynamic v) => double.tryParse(v?.toString() ?? "") ?? 0;
-
-        final newTemp = toD(d["temperature"]);
-        final newVib = toD(d["vibration"]);
-        final newPressure = toD(d["pressure"]);
-        final newFlow = toD(d["flow_rate"]);
-
-        // ✅ save same keys so Dashboard + Health both match
-        await prefs.setDouble("latest_temp", newTemp);
-        await prefs.setDouble("latest_vib", newVib);
-        await prefs.setDouble("latest_pressure", newPressure);
-        await prefs.setDouble("latest_flow", newFlow);
-
-        if (!mounted) return;
-
-        setState(() {
-          temp = newTemp;
-          vib = newVib;
-          pressure = newPressure;
-          flow = newFlow;
-        });
-      } else {
-        await _loadFromPrefsOnly();
-      }
-    } catch (_) {
-      await _loadFromPrefsOnly();
-    }
-  }
-
-  // ✅ fallback if backend fails (also used on page open)
   Future<void> _loadFromPrefsOnly() async {
     final prefs = await SharedPreferences.getInstance();
     final newTemp = prefs.getDouble("latest_temp") ?? 0;
@@ -125,7 +70,7 @@ class _PumpHealthPageState extends State<PumpHealthPage> {
     required double progress,
   }) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8), // ✅ slightly tighter
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -143,7 +88,7 @@ class _PumpHealthPageState extends State<PumpHealthPage> {
               ),
             ],
           ),
-          const SizedBox(height: 6), // ✅ tighter
+          const SizedBox(height: 6),
           ClipRRect(
             borderRadius: BorderRadius.circular(12),
             child: LinearProgressIndicator(
@@ -161,12 +106,9 @@ class _PumpHealthPageState extends State<PumpHealthPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-
       body: SafeArea(
-        // ✅ CHANGED: remove SingleChildScrollView so page won't scroll
         child: Column(
           children: [
-            // TOP CURVED HEADER (fixed height)
             Container(
               height: 230,
               width: double.infinity,
@@ -179,7 +121,6 @@ class _PumpHealthPageState extends State<PumpHealthPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // BACK BUTTON
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 15, 16, 0),
                     child: GestureDetector(
@@ -214,13 +155,10 @@ class _PumpHealthPageState extends State<PumpHealthPage> {
                 ],
               ),
             ),
-
-            // ✅ CHANGED: everything below fits in remaining space
             Expanded(
               child: Column(
                 children: [
                   const SizedBox(height: 14),
-
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 20),
                     child: Align(
@@ -231,10 +169,7 @@ class _PumpHealthPageState extends State<PumpHealthPage> {
                       ),
                     ),
                   ),
-
                   const SizedBox(height: 10),
-
-                  // ✅ CHANGED: reduce chart height so bars fit without scroll
                   Container(
                     margin: const EdgeInsets.symmetric(horizontal: 20),
                     height: 160,
@@ -246,10 +181,8 @@ class _PumpHealthPageState extends State<PumpHealthPage> {
                       child: Text("Line Chart Here", style: TextStyle(color: Colors.white54)),
                     ),
                   ),
-
                   const SizedBox(height: 10),
 
-                  // ✅ PROGRESS BARS
                   _sensorBar(
                     title: "Temperature",
                     valueText: temp == 0 ? "--" : "${temp.toStringAsFixed(1)} C",
@@ -271,14 +204,13 @@ class _PumpHealthPageState extends State<PumpHealthPage> {
                     progress: _progress(flow, 100),
                   ),
 
-                  const Spacer(), // ✅ keeps spacing stable without scroll
+                  const Spacer(),
                 ],
               ),
             ),
           ],
         ),
       ),
-
       bottomNavigationBar: _bottomBar(context),
     );
   }
@@ -306,11 +238,7 @@ class _PumpHealthPageState extends State<PumpHealthPage> {
               );
             },
           ),
-          const BottomItem(
-            icon: Icons.favorite,
-            label: "Health",
-            isActive: true,
-          ),
+          const BottomItem(icon: Icons.favorite, label: "Health", isActive: true),
           BottomItem(
             icon: Icons.warning_amber_outlined,
             label: "Alerts",
@@ -337,7 +265,7 @@ class _PumpHealthPageState extends State<PumpHealthPage> {
   }
 }
 
-// GAUGE METER
+// GAUGE METER 
 class GaugeMeter extends StatelessWidget {
   const GaugeMeter({super.key});
 
@@ -406,7 +334,6 @@ class ArcPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-// BOTTOM ITEM
 class BottomItem extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -440,11 +367,7 @@ class BottomItem extends StatelessWidget {
                       border: Border.all(color: Colors.white, width: 5),
                     )
                   : null,
-              child: Icon(
-                icon,
-                size: isActive ? 22 : 20,
-                color: Colors.white,
-              ),
+              child: Icon(icon, size: isActive ? 22 : 20, color: Colors.white),
             ),
             const SizedBox(height: 2),
             Text(

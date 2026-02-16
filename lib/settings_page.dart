@@ -40,7 +40,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
   String _avatarText = "U";
 
-  final String baseUrl = "http://10.0.2.2/flutter_application_2-main/api";
+  final String baseUrl = "http://192.168.109.136/flutter_application_2-main/api";
 
   // Pumps list
   List<Map<String, dynamic>> _pumps = [];
@@ -102,7 +102,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
   // PROFILE UPDATE TO BACKEND
   Future<void> _saveProfileToBackend() async {
-    // Name controller contains "First Last"
+    
     final fullName = nameController.text.trim();
     final parts =
         fullName.split(RegExp(r"\s+")).where((e) => e.isNotEmpty).toList();
@@ -185,7 +185,7 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
-  // Get pumps for dropdown
+  // Get pumps dropdown
   Future<void> _loadPumpsForUser() async {
     final prefs = await SharedPreferences.getInstance();
     int userId = prefs.getInt("user_id") ?? 0;
@@ -625,7 +625,7 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 }
 
-// Bottom Navigation (✅ UPDATED to show white-stroke circle when active)
+// Bottom Navigation
 class _BottomNavBar extends StatelessWidget {
   const _BottomNavBar();
 
@@ -648,13 +648,13 @@ class _BottomNavBar extends StatelessWidget {
           _item(context, Icons.dashboard, "Dashboard", const DashboardPage()),
           _item(context, Icons.favorite, "Health", const PumpHealthPage()),
           _item(context, Icons.warning_amber_outlined, "Alerts", const AlertsPage()),
-          _item(context, Icons.settings, "Settings", null, active: true), // ✅ active
+          _item(context, Icons.settings, "Settings", null, active: true), 
         ],
       ),
     );
   }
 
-  // ✅ UPDATED ITEM: draws same active circle + white stroke
+  
   Widget _item(BuildContext context, IconData icon, String label, Widget? page,
       {bool active = false}) {
     return GestureDetector(
@@ -676,7 +676,7 @@ class _BottomNavBar extends StatelessWidget {
                   ? BoxDecoration(
                       shape: BoxShape.circle,
                       color: darkGreen,
-                      border: Border.all(color: Colors.white, width: 5), // ✅ white stroke
+                      border: Border.all(color: Colors.white, width: 5), 
                     )
                   : null,
               child: Icon(

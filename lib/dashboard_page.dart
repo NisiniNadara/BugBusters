@@ -18,35 +18,36 @@ class DashboardPage extends StatefulWidget {
 class _DashboardPageState extends State<DashboardPage> {
   String firstName = "";
 
-  // ✅ dynamic sensor values
+  // show from prefs
   String temperatureText = "-- C";
   String vibrationText = "-- mm/s";
   String pressureText = "-- PSI";
   String flowText = "-- %";
 
-  // ✅ NEW: RUL (changes once per 24 hours)
   int rulDays = 45;
 
   Timer? _timer;
 
-  // ✅ your base url
-  final String baseUrl = "http://10.0.2.2/flutter_application_2-main/api";
+  // your base url
+  final String baseUrl =
+      "http://192.168.109.136/flutter_application_2-main/api";
 
   @override
   void initState() {
     super.initState();
     _loadUserName();
 
-    // ✅ IMPORTANT: do NOT call backend on refresh/open
-    // just show last saved values
+    // show last saved values immediately
     _loadFromPrefsOnly();
 
-    // ✅ NEW: load/update RUL only once per 24 hours
     _loadOrUpdateRulOncePerDay();
 
-    // ✅ auto refresh every 1 minute (ONLY here values change)
-    _timer = Timer.periodic(const Duration(minutes: 1), (_) {
-      _fetchPumpStatus();
+    
+    _fetchPumpStatusAndSave();
+
+    // every 60 seconds
+    _timer = Timer.periodic(const Duration(seconds: 60), (_) {
+      _fetchPumpStatusAndSave();
     });
   }
 
@@ -64,7 +65,6 @@ class _DashboardPageState extends State<DashboardPage> {
     });
   }
 
-  // ✅ NEW: RUL changes ONLY once per 24 hours (dummy)
   Future<void> _loadOrUpdateRulOncePerDay() async {
     final prefs = await SharedPreferences.getInstance();
 
@@ -89,7 +89,7 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
-  // ✅ load last saved values (no backend call)
+  // read prefs only (NO backend)
   Future<void> _loadFromPrefsOnly() async {
     final prefs = await SharedPreferences.getInstance();
 
@@ -108,11 +108,14 @@ class _DashboardPageState extends State<DashboardPage> {
     });
   }
 
-  Future<void> _fetchPumpStatus() async {
+  
+  Future<void> _fetchPumpStatusAndSave() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final dynamic rawUserId = prefs.get("user_id");
       final String userId = rawUserId?.toString() ?? "";
+
+      if (userId.isEmpty || userId == "0") return;
 
       final url = Uri.parse("$baseUrl/get_dashboard_status.php");
 
@@ -124,10 +127,9 @@ class _DashboardPageState extends State<DashboardPage> {
 
       final decoded = jsonDecode(res.body);
 
-      if (decoded["success"] == true && decoded["data"] is Map) {
+      if (decoded is Map && decoded["success"] == true && decoded["data"] is Map) {
         final Map d = decoded["data"] as Map;
 
-        // ✅ parse safely
         double toD(dynamic v) => double.tryParse(v?.toString() ?? "") ?? 0;
 
         final temp = toD(d["temperature"]);
@@ -135,23 +137,17 @@ class _DashboardPageState extends State<DashboardPage> {
         final pres = toD(d["pressure"]);
         final flow = toD(d["flow_rate"]);
 
-        // ✅ SAVE for PumpHealthPage (same keys)
+        
         await prefs.setDouble("latest_temp", temp);
         await prefs.setDouble("latest_vib", vib);
         await prefs.setDouble("latest_pressure", pres);
         await prefs.setDouble("latest_flow", flow);
 
-        if (!mounted) return;
-
-        setState(() {
-          temperatureText = "$temp C";
-          vibrationText = "$vib mm/s";
-          pressureText = "$pres PSI";
-          flowText = "$flow %";
-        });
+        //same values Health will read
+        await _loadFromPrefsOnly();
       }
     } catch (_) {
-      // silent fail
+      
     }
   }
 
@@ -163,7 +159,6 @@ class _DashboardPageState extends State<DashboardPage> {
         child: SingleChildScrollView(
           child: Column(
             children: [
-              //  TOP GREEN HEADER
               Container(
                 width: double.infinity,
                 height: 150,
@@ -178,10 +173,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: 20),
-                    const Text(
-                      "Welcome back,",
-                      style: TextStyle(color: Colors.white70),
-                    ),
+                    const Text("Welcome back,", style: TextStyle(color: Colors.white70)),
                     const SizedBox(height: 6),
                     Text(
                       firstName.isEmpty ? "Welcome !" : "$firstName !",
@@ -197,7 +189,6 @@ class _DashboardPageState extends State<DashboardPage> {
 
               const SizedBox(height: 10),
 
-              //  RUL CARD
               Transform.translate(
                 offset: const Offset(0, -30),
                 child: Container(
@@ -224,8 +215,6 @@ class _DashboardPageState extends State<DashboardPage> {
                       const SizedBox(height: 4),
                       const Divider(thickness: 1, indent: 40, endIndent: 40),
                       const SizedBox(height: 6),
-
-                      // ✅ CHANGED: show dummy RUL (updates once per 24h)
                       Text(
                         "$rulDays",
                         style: const TextStyle(
@@ -234,11 +223,7 @@ class _DashboardPageState extends State<DashboardPage> {
                           color: Colors.amber,
                         ),
                       ),
-
-                      const Text(
-                        "Days Remaining",
-                        style: TextStyle(fontSize: 12),
-                      ),
+                      const Text("Days Remaining", style: TextStyle(fontSize: 12)),
                     ],
                   ),
                 ),
@@ -246,7 +231,6 @@ class _DashboardPageState extends State<DashboardPage> {
 
               const SizedBox(height: 6),
 
-              //  PUMP HEALTH STATUS (✅ now dynamic)
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 24),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -313,7 +297,6 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  // BOTTOM BAR (unchanged)
   Widget _bottomBar(BuildContext context) {
     return Container(
       height: 70,
@@ -327,12 +310,7 @@ class _DashboardPageState extends State<DashboardPage> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          BottomItem(
-            icon: Icons.dashboard,
-            label: "Dashboard",
-            isActive: true,
-            onTap: () {},
-          ),
+          BottomItem(icon: Icons.dashboard, label: "Dashboard", isActive: true, onTap: () {}),
           BottomItem(
             icon: Icons.favorite_border,
             label: "Health",
@@ -369,7 +347,6 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 }
 
-// STATUS BOX (same as yours)
 class StatusBox extends StatelessWidget {
   final String title;
   final String value;
@@ -400,17 +377,11 @@ class StatusBox extends StatelessWidget {
               children: [
                 Icon(icon, size: 16),
                 const SizedBox(width: 6),
-                Text(
-                  title,
-                  style: const TextStyle(fontSize: 11, color: Colors.black54),
-                ),
+                Text(title, style: const TextStyle(fontSize: 11, color: Colors.black54)),
               ],
             ),
             const SizedBox(height: 6),
-            Text(
-              value,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
+            Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           ],
         ),
       ),
@@ -418,7 +389,6 @@ class StatusBox extends StatelessWidget {
   }
 }
 
-// BottomItem (unchanged)
 class BottomItem extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -452,21 +422,10 @@ class BottomItem extends StatelessWidget {
                       border: Border.all(color: Colors.white, width: 5),
                     )
                   : null,
-              child: Icon(
-                icon,
-                size: isActive ? 22 : 20,
-                color: Colors.white,
-              ),
+              child: Icon(icon, size: isActive ? 22 : 20, color: Colors.white),
             ),
             const SizedBox(height: 2),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 11,
-                height: 1.0,
-                color: Colors.white,
-              ),
-            ),
+            Text(label, style: const TextStyle(fontSize: 11, height: 1.0, color: Colors.white)),
           ],
         ),
       ),
