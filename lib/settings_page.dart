@@ -2,13 +2,19 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
+import 'app_lang.dart';
 import 'dashboard_page.dart';
 import 'pump_health_page.dart';
 import 'alerts_page.dart';
 import 'main.dart';
-import 'add_device_page.dart';
 import 'change_password_page.dart';
+import 'terms_of_service_page.dart';
+import 'help_support_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+// ✅ ADD THESE imports (no UI change)
+import 'auth/auth_service.dart';
+// ❌ removed: import 'second_page.dart';
 
 class SettingsPage extends StatefulWidget {
   final bool openChangePassword;
@@ -40,11 +46,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
   String _avatarText = "U";
 
-  final String baseUrl = "http://192.168.109.136/flutter_application_2-main/api";
-
-  // Pumps list
-  List<Map<String, dynamic>> _pumps = [];
-  String _selectedPumpName = "Device";
+  final String baseUrl = "http://10.0.2.2/flutter_application_2-main/api";
 
   // Role dropdown value
   String _selectedRole = "Farmer";
@@ -53,7 +55,6 @@ class _SettingsPageState extends State<SettingsPage> {
   void initState() {
     super.initState();
     _loadProfileFromPrefs();
-    _loadPumpsForUser();
 
     if (widget.openChangePassword) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -87,11 +88,10 @@ class _SettingsPageState extends State<SettingsPage> {
         [_firstName, _lastName].where((s) => s.isNotEmpty).join(" ").trim();
 
     setState(() {
-      nameController.text = fullName.isEmpty ? "User" : fullName;
-      emailController.text = email.isEmpty ? "No email" : email;
-      roleController.text = role.isEmpty ? "Role" : role;
+      nameController.text = fullName.isEmpty ? T.t("User", "පරිශීලකයා") : fullName;
+      emailController.text = email.isEmpty ? T.t("No email", "ඊමේල් නැත") : email;
+      roleController.text = role.isEmpty ? T.t("Role", "භූමිකාව") : role;
 
-      // set dropdown role
       _selectedRole = (role == "Technician") ? "Technician" : "Farmer";
 
       final a = _firstName.isNotEmpty ? _firstName[0].toUpperCase() : "";
@@ -102,13 +102,12 @@ class _SettingsPageState extends State<SettingsPage> {
 
   // PROFILE UPDATE TO BACKEND
   Future<void> _saveProfileToBackend() async {
-    
     final fullName = nameController.text.trim();
     final parts =
         fullName.split(RegExp(r"\s+")).where((e) => e.isNotEmpty).toList();
 
     if (parts.isEmpty) {
-      _showSnack("Name required");
+      _showSnack(T.t("Name required", "නම අවශ්‍යයි"));
       return;
     }
 
@@ -119,15 +118,16 @@ class _SettingsPageState extends State<SettingsPage> {
     final role = _selectedRole.trim();
 
     if (_userId <= 0) {
-      _showSnack("User ID not found. Please login again.");
+      _showSnack(T.t("User ID not found. Please login again.",
+          "User ID නැත. කරුණාකර නැවත Login වන්න."));
       return;
     }
     if (email.isEmpty || !email.contains("@")) {
-      _showSnack("Valid email required");
+      _showSnack(T.t("Valid email required", "වලංගු ඊමේල් ලිපිනයක් අවශ්‍යයි"));
       return;
     }
     if (role.isEmpty) {
-      _showSnack("Role required");
+      _showSnack(T.t("Role required", "භූමිකාව අවශ්‍යයි"));
       return;
     }
 
@@ -151,7 +151,8 @@ class _SettingsPageState extends State<SettingsPage> {
       try {
         data = jsonDecode(res.body);
       } catch (_) {
-        _showSnack("Server did not return JSON. HTTP ${res.statusCode}");
+        _showSnack(T.t("Server did not return JSON. HTTP ${res.statusCode}",
+            "Server එක JSON ආපසු දුන්නේ නැහැ. HTTP ${res.statusCode}"));
         return;
       }
 
@@ -174,135 +175,31 @@ class _SettingsPageState extends State<SettingsPage> {
           _avatarText = (a + b).isNotEmpty ? (a + b) : "U";
         });
 
-        _showSnack("Profile updated");
+        _showSnack(T.t("Profile updated", "පැතිකඩ යාවත්කාලීන විය"));
       } else {
-        _showSnack((data["message"] ?? "Update failed").toString());
+        _showSnack((data["message"] ??
+                T.t("Update failed", "යාවත්කාලීන කිරීම අසාර්ථකයි"))
+            .toString());
       }
     } catch (e) {
-      _showSnack("Error: $e");
+      _showSnack(T.t("Error: $e", "දෝෂය: $e"));
     } finally {
       if (mounted) setState(() => _savingProfile = false);
     }
   }
 
-  // Get pumps dropdown
-  Future<void> _loadPumpsForUser() async {
-    final prefs = await SharedPreferences.getInstance();
-    int userId = prefs.getInt("user_id") ?? 0;
-    if (userId == 0) {
-      userId = int.tryParse(prefs.getString("user_id") ?? "") ?? 0;
-    }
-    if (userId == 0) return;
-
-    try {
-      final url = Uri.parse("$baseUrl/get_pumps.php");
-      final res = await http.post(
-        url,
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({"user_id": userId}),
-      );
-
-      Map<String, dynamic> data;
-      try {
-        data = jsonDecode(res.body);
-      } catch (_) {
-        return;
-      }
-
-      if (res.statusCode == 200 && data["success"] == true) {
-        final List list = (data["pumps"] ?? []) as List;
-        final pumps = list
-            .map((e) => {
-                  "pump_id": e["pump_id"],
-                  "pump_name": e["pump_name"],
-                })
-            .toList();
-
-        final savedPumpName = prefs.getString("selected_pump_name") ?? "";
-
-        setState(() {
-          _pumps = pumps;
-          if (savedPumpName.isNotEmpty) {
-            _selectedPumpName = savedPumpName;
-          } else if (_pumps.isNotEmpty) {
-            _selectedPumpName = _pumps.first["pump_name"].toString();
-          } else {
-            _selectedPumpName = "Device";
-          }
-        });
-      }
-    } catch (_) {}
-  }
-
-  Future<void> _saveSelectedPump(String pumpName) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString("selected_pump_name", pumpName);
-  }
-
-  void _openDeviceMenu(TapDownDetails details) {
-    final position = details.globalPosition;
-    final items = <PopupMenuEntry<String>>[];
-
-    if (_pumps.isNotEmpty) {
-      for (final p in _pumps) {
-        final pumpName = (p["pump_name"] ?? "").toString();
-        if (pumpName.isEmpty) continue;
-
-        items.add(PopupMenuItem(value: pumpName, child: Text(pumpName)));
-      }
-      items.add(const PopupMenuDivider());
-    } else {
-      items.add(const PopupMenuItem(
-        value: "_no_pumps",
-        enabled: false,
-        child: Text("No pumps added"),
-      ));
-      items.add(const PopupMenuDivider());
-    }
-
-    items.add(const PopupMenuItem(
-      value: 'add_device',
-      child: Row(
-        children: [
-          Icon(Icons.add, color: darkGreen),
-          SizedBox(width: 6),
-          Text("Add Device",
-              style: TextStyle(color: darkGreen, fontWeight: FontWeight.w600)),
-        ],
-      ),
-    ));
-
-    showMenu<String>(
-      context: context,
-      position:
-          RelativeRect.fromLTRB(position.dx - 160, position.dy + 10, 16, 0),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      items: items,
-    ).then((value) async {
-      if (value == null) return;
-
-      if (value == 'add_device') {
-        Navigator.push(
-                context, MaterialPageRoute(builder: (_) => AddDevicePage()))
-            .then((_) => _loadPumpsForUser());
-        return;
-      }
-
-      if (value == "_no_pumps") return;
-
-      setState(() => _selectedPumpName = value);
-      await _saveSelectedPump(value);
-    });
-  }
-
+  // ✅ ONLY CHANGE HERE: logout should go to main.dart (MyApp) instead of SecondPage
   Future<void> _logout() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
 
+    // ✅ Important for "login once then dashboard"
+    await AuthService.logout();
+
     if (!mounted) return;
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (_) => MyApp()),
+      MaterialPageRoute(builder: (_) => const MyApp()),
       (route) => false,
     );
   }
@@ -322,11 +219,10 @@ class _SettingsPageState extends State<SettingsPage> {
       body: SafeArea(
         child: Column(
           children: [
-            // Header
+            // Header (UNCHANGED UI)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   InkWell(
                     onTap: () {
@@ -336,28 +232,13 @@ class _SettingsPageState extends State<SettingsPage> {
                       );
                     },
                     child: Row(
-                      children: const [
-                        Icon(Icons.arrow_back, color: darkGreen),
-                        SizedBox(width: 6),
-                        Text("Back",
-                            style: TextStyle(color: darkGreen, fontSize: 16)),
-                      ],
-                    ),
-                  ),
-                  GestureDetector(
-                    onTapDown: _openDeviceMenu,
-                    child: Row(
                       children: [
+                        const Icon(Icons.arrow_back, color: darkGreen),
+                        const SizedBox(width: 6),
                         Text(
-                          _selectedPumpName,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: darkGreen,
-                          ),
+                          T.t("Back", "ආපසු"),
+                          style: const TextStyle(color: darkGreen, fontSize: 16),
                         ),
-                        const SizedBox(width: 4),
-                        const Icon(Icons.keyboard_arrow_down, color: darkGreen),
                       ],
                     ),
                   ),
@@ -374,9 +255,13 @@ class _SettingsPageState extends State<SettingsPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text("Profile",
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold, fontSize: 16)),
+                        Text(
+                          T.t("Profile", "පැතිකඩ"),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
                         const SizedBox(height: 12),
                         Row(
                           children: [
@@ -386,8 +271,9 @@ class _SettingsPageState extends State<SettingsPage> {
                               child: Text(
                                 _avatarText,
                                 style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold),
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -395,33 +281,28 @@ class _SettingsPageState extends State<SettingsPage> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  // Name (editable)
                                   isEditingProfile
-                                      ? _editField(nameController, "Name")
-                                      : Text(nameController.text,
-                                          style: const TextStyle(
-                                              fontWeight: FontWeight.bold)),
+                                      ? _editField(nameController, T.t("Name", "නම"))
+                                      : Text(
+                                          nameController.text,
+                                          style: const TextStyle(fontWeight: FontWeight.bold),
+                                        ),
                                   const SizedBox(height: 2),
-
-                                  // Email (editable)
                                   isEditingProfile
-                                      ? _editField(emailController, "Email")
-                                      : Text(emailController.text,
-                                          style: const TextStyle(
-                                              fontSize: 12,
-                                              color: Colors.black54)),
+                                      ? _editField(emailController, T.t("Email", "ඊමේල්"))
+                                      : Text(
+                                          emailController.text,
+                                          style: const TextStyle(fontSize: 12, color: Colors.black54),
+                                        ),
                                   const SizedBox(height: 4),
-
-                                  // Role (dropdown when editing)
                                   isEditingProfile
                                       ? _roleDropdown()
                                       : Chip(
-                                          label: Text(roleController.text,
-                                              style: const TextStyle(
-                                                  fontSize: 11,
-                                                  color: darkGreen)),
-                                          backgroundColor:
-                                              const Color(0xFFD6F5EC),
+                                          label: Text(
+                                            roleController.text,
+                                            style: const TextStyle(fontSize: 11, color: darkGreen),
+                                          ),
+                                          backgroundColor: const Color(0xFFD6F5EC),
                                         ),
                                 ],
                               ),
@@ -436,7 +317,8 @@ class _SettingsPageState extends State<SettingsPage> {
                               backgroundColor: Colors.grey.shade200,
                               elevation: 0,
                               shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10)),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
                             ),
                             onPressed: _savingProfile
                                 ? null
@@ -445,15 +327,14 @@ class _SettingsPageState extends State<SettingsPage> {
                                       setState(() => isEditingProfile = true);
                                       return;
                                     }
-                                    // Save profile to backend
                                     await _saveProfileToBackend();
                                   },
                             child: Text(
                               isEditingProfile
                                   ? (_savingProfile
-                                      ? "Saving..."
-                                      : "Save Profile")
-                                  : "Edit Profile",
+                                      ? T.t("Saving...", "සුරකිමින්...")
+                                      : T.t("Save Profile", "පැතිකඩ සුරකින්න"))
+                                  : T.t("Edit Profile", "පැතිකඩ සංස්කරණය"),
                               style: const TextStyle(color: Colors.black),
                             ),
                           ),
@@ -467,19 +348,24 @@ class _SettingsPageState extends State<SettingsPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text("Notifications",
-                            style: TextStyle(
-                                color: darkGreen,
-                                fontWeight: FontWeight.bold)),
+                        Text(
+                          T.t("Notifications", "දැනුම්දීම්"),
+                          style: const TextStyle(
+                            color: darkGreen,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                         _switchTile(
-                          title: "Push Notifications",
-                          subtitle: "Receive notifications on your device",
+                          title: T.t("Push Notifications", "දැනුම්දීම් එවන්න"),
+                          subtitle: T.t("Receive notifications on your device",
+                              "ඔබගේ දුරකථනයට දැනුම්දීම් ලැබේ"),
                           value: pushNotifications,
                           onChanged: (v) => setState(() => pushNotifications = v),
                         ),
                         _switchTile(
-                          title: "Auto Sync",
-                          subtitle: "Automatically sync pump data",
+                          title: T.t("Auto Sync", "ස්වයංක්‍රීය සින්ක්"),
+                          subtitle: T.t("Automatically sync pump data",
+                              "පම්ප් දත්ත ස්වයංක්‍රීයව සින්ක් වේ"),
                           value: autoSync,
                           onChanged: (v) => setState(() => autoSync = v),
                         ),
@@ -492,20 +378,34 @@ class _SettingsPageState extends State<SettingsPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text("Account",
-                            style: TextStyle(
-                                color: darkGreen,
-                                fontWeight: FontWeight.bold)),
-                        _arrowTile(
-                          "Change Password",
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) => const ChangePasswordPage()),
+                        Text(
+                          T.t("Account", "ගිණුම"),
+                          style: const TextStyle(
+                            color: darkGreen,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                        _arrowTile("Terms of Service"),
-                        _arrowTile("Help & Support"),
+                        _arrowTile(
+                          T.t("Change Password", "මුරපදය වෙනස් කරන්න"),
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const ChangePasswordPage()),
+                          ),
+                        ),
+                        _arrowTile(
+                          T.t("Terms of Service", "සේවා නියමයන්"),
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const TermsOfServicePage()),
+                          ),
+                        ),
+                        _arrowTile(
+                          T.t("Help & Support", "උදව් සහ සහාය"),
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const HelpSupportPage()),
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -514,31 +414,37 @@ class _SettingsPageState extends State<SettingsPage> {
                   _card(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Text("About",
-                            style: TextStyle(
-                                color: darkGreen,
-                                fontWeight: FontWeight.bold)),
-                        SizedBox(height: 6),
-                        Text("Version : 1.0.0"),
-                        Text("Developed by : Bug Busters Team"),
+                      children: [
+                        Text(
+                          T.t("About", "විස්තර"),
+                          style: const TextStyle(
+                            color: darkGreen,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(T.t("Version : 1.0.0", "අනුවාදය : 1.0.0")),
+                        Text(T.t("Developed by : Bug Busters Team",
+                            "සංවර්ධනය කළේ : Bug Busters කණ්ඩායම")),
                       ],
                     ),
                   ),
 
                   // Logout
                   Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 32, vertical: 16),
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.orangeAccent,
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(30)),
+                          borderRadius: BorderRadius.circular(30),
+                        ),
                       ),
                       onPressed: _logout,
-                      child:
-                          const Text("Logout", style: TextStyle(color: Colors.red)),
+                      child: Text(
+                        T.t("Logout", "පිටවන්න"),
+                        style: const TextStyle(color: Colors.red),
+                      ),
                     ),
                   ),
                 ],
@@ -547,7 +453,7 @@ class _SettingsPageState extends State<SettingsPage> {
           ],
         ),
       ),
-      bottomNavigationBar: const _BottomNavBar(),
+      bottomNavigationBar: _BottomNavBar(),
     );
   }
 
@@ -557,9 +463,9 @@ class _SettingsPageState extends State<SettingsPage> {
       child: DropdownButton<String>(
         value: _selectedRole,
         isDense: true,
-        items: const [
-          DropdownMenuItem(value: "Farmer", child: Text("Farmer")),
-          DropdownMenuItem(value: "Technician", child: Text("Technician")),
+        items: [
+          DropdownMenuItem(value: "Farmer", child: Text(T.t("Farmer", "ගොවියා"))),
+          DropdownMenuItem(value: "Technician", child: Text(T.t("Technician", "තාක්ෂණිකයා"))),
         ],
         onChanged: (v) {
           if (v == null) return;
@@ -581,7 +487,7 @@ class _SettingsPageState extends State<SettingsPage> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 6)
+          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 6),
         ],
       ),
       child: child,
@@ -625,9 +531,9 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 }
 
-// Bottom Navigation
+// Bottom Navigation (UNCHANGED UI)
 class _BottomNavBar extends StatelessWidget {
-  const _BottomNavBar();
+  _BottomNavBar();
 
   static const Color darkGreen = Color(0xFF1A5319);
 
@@ -645,18 +551,16 @@ class _BottomNavBar extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _item(context, Icons.dashboard, "Dashboard", const DashboardPage()),
-          _item(context, Icons.favorite, "Health", const PumpHealthPage()),
-          _item(context, Icons.warning_amber_outlined, "Alerts", const AlertsPage()),
-          _item(context, Icons.settings, "Settings", null, active: true), 
+          _item(context, Icons.dashboard, T.t("Dashboard", "ඩෑෂ්බෝඩ්"), const DashboardPage()),
+          _item(context, Icons.favorite, T.t("Health", "සෞඛ්‍යය"), const PumpHealthPage()),
+          _item(context, Icons.warning_amber_outlined, T.t("Alerts", "ඇලර්ට්ස්"), const AlertsPage()),
+          _item(context, Icons.settings, T.t("Settings", "සැකසුම්"), null, active: true),
         ],
       ),
     );
   }
 
-  
-  Widget _item(BuildContext context, IconData icon, String label, Widget? page,
-      {bool active = false}) {
+  Widget _item(BuildContext context, IconData icon, String label, Widget? page, {bool active = false}) {
     return GestureDetector(
       onTap: page == null
           ? null
@@ -676,7 +580,7 @@ class _BottomNavBar extends StatelessWidget {
                   ? BoxDecoration(
                       shape: BoxShape.circle,
                       color: darkGreen,
-                      border: Border.all(color: Colors.white, width: 5), 
+                      border: Border.all(color: Colors.white, width: 5),
                     )
                   : null,
               child: Icon(

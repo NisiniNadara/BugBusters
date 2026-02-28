@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'app_lang.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'dashboard_page.dart';
@@ -131,10 +132,10 @@ class _PumpHealthPageState extends State<PumpHealthPage> {
                         );
                       },
                       child: Row(
-                        children: const [
-                          Icon(Icons.arrow_back, color: Colors.white),
-                          SizedBox(width: 6),
-                          Text("Back", style: TextStyle(color: Colors.white)),
+                        children: [
+                          const Icon(Icons.arrow_back, color: Colors.white),
+                          const SizedBox(width: 6),
+                          Text(T.t("Back","ආපසු"), style: const TextStyle(color: Colors.white)),
                         ],
                       ),
                     ),
@@ -177,8 +178,8 @@ class _PumpHealthPageState extends State<PumpHealthPage> {
                       color: Colors.black,
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Center(
-                      child: Text("Line Chart Here", style: TextStyle(color: Colors.white54)),
+                    child: Center(
+                      child: Text(T.t("Line Chart Here","රේඛා චාට් මෙහි"), style: const TextStyle(color: Colors.white54)),
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -230,7 +231,7 @@ class _PumpHealthPageState extends State<PumpHealthPage> {
         children: [
           BottomItem(
             icon: Icons.dashboard,
-            label: "Dashboard",
+            label: T.t("Dashboard","ඩෑෂ්බෝඩ්"),
             onTap: () {
               Navigator.pushReplacement(
                 context,
@@ -238,10 +239,10 @@ class _PumpHealthPageState extends State<PumpHealthPage> {
               );
             },
           ),
-          const BottomItem(icon: Icons.favorite, label: "Health", isActive: true),
+          BottomItem(icon: Icons.favorite, label: T.t("Health","සෞඛ්‍යය"), isActive: true),
           BottomItem(
             icon: Icons.warning_amber_outlined,
-            label: "Alerts",
+            label: T.t("Alerts","ඇලර්ට්ස්"),
             onTap: () {
               Navigator.pushReplacement(
                 context,
@@ -251,7 +252,7 @@ class _PumpHealthPageState extends State<PumpHealthPage> {
           ),
           BottomItem(
             icon: Icons.settings,
-            label: "Settings",
+            label: T.t("Settings","සැකසුම්"),
             onTap: () {
               Navigator.pushReplacement(
                 context,
@@ -340,7 +341,7 @@ class BottomItem extends StatelessWidget {
   final bool isActive;
   final VoidCallback? onTap;
 
-  const BottomItem({
+  BottomItem({
     super.key,
     required this.icon,
     required this.label,

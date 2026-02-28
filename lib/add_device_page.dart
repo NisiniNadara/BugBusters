@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'app_lang.dart';
 import 'dashboard_page.dart';
 
 class AddDevicePage extends StatefulWidget {
@@ -11,15 +12,13 @@ class AddDevicePage extends StatefulWidget {
 }
 
 class _AddDevicePageState extends State<AddDevicePage> {
-  final _firstNameCtrl = TextEditingController();
-  final _emailCtrl = TextEditingController();
   final _deviceNameCtrl = TextEditingController();
   final _locationCtrl = TextEditingController();
 
   int _userId = 0;
   bool _isLoading = false;
 
-  final String baseUrl = "http://192.168.109.136/flutter_application_2-main/api";
+  final String baseUrl = "http://10.0.2.2/flutter_application_2-main/api";
 
   @override
   void initState() {
@@ -30,10 +29,6 @@ class _AddDevicePageState extends State<AddDevicePage> {
   Future<void> _loadUserData() async {
     final prefs = await SharedPreferences.getInstance();
 
-    _firstNameCtrl.text = (prefs.getString("first_name") ?? "").trim();
-    _emailCtrl.text = (prefs.getString("email") ?? "").trim();
-
-    // user_id load
     _userId = prefs.getInt("user_id") ?? 0;
     if (_userId == 0) {
       _userId = int.tryParse(prefs.getString("user_id") ?? "") ?? 0;
@@ -48,22 +43,16 @@ class _AddDevicePageState extends State<AddDevicePage> {
   }
 
   Future<void> _addDevice() async {
-    final firstName = _firstNameCtrl.text.trim();
     final deviceName = _deviceNameCtrl.text.trim();
     final location = _locationCtrl.text.trim();
 
     if (_userId <= 0) {
-      _showSnack("User ID missing. Please login again.");
-      return;
-    }
-
-    if (firstName.isEmpty) {
-      _showSnack("First name missing. Please login again.");
+      _showSnack(T.t("User ID missing. Please login again.", "User ID නැත. කරුණාකර නැවත Login වන්න."));
       return;
     }
 
     if (deviceName.isEmpty || location.isEmpty) {
-      _showSnack("Please fill Device Name and Pump Location");
+      _showSnack(T.t("Please fill Pump Name and Pump Location", "කරුණාකර පම්ප් නාමය සහ පම්ප් ස්ථානය පුරවන්න"));
       return;
     }
 
@@ -72,12 +61,11 @@ class _AddDevicePageState extends State<AddDevicePage> {
     try {
       final url = Uri.parse("$baseUrl/add_pump.php");
 
-      // send user_id + pump_name + location to backend
       final payload = {
         "user_id": _userId,
         "pump_name": deviceName,
         "location": location,
-        "pump_location": location, 
+        "pump_location": location,
       };
 
       final res = await http
@@ -90,7 +78,7 @@ class _AddDevicePageState extends State<AddDevicePage> {
 
       final raw = res.body.trim();
       if (raw.isEmpty) {
-        _showSnack("Server returned empty response. Check add_pump.php");
+        _showSnack(T.t("Server returned empty response. Check add_pump.php", "Server එකෙන් හිස් ප්‍රතිචාරයක් ආවා. add_pump.php පරීක්ෂා කරන්න"));
         return;
       }
 
@@ -100,27 +88,27 @@ class _AddDevicePageState extends State<AddDevicePage> {
         if (decoded is Map<String, dynamic>) {
           data = decoded;
         } else {
-          _showSnack("Server response is not JSON object");
+          _showSnack(T.t("Server response is not JSON object", "Server ප්‍රතිචාරය JSON object එකක් නෙවේ"));
           return;
         }
       } catch (_) {
         final short = raw.length > 220 ? raw.substring(0, 220) : raw;
-        _showSnack("Server not JSON (HTTP ${res.statusCode}): $short");
+        _showSnack(T.t("Server not JSON (HTTP ${res.statusCode}): $short", "Server JSON නෙවේ (HTTP ${res.statusCode}): $short"));
         return;
       }
 
       if (data["success"] == true) {
-        _showSnack((data["message"] ?? "Device added successfully").toString());
+        _showSnack((data["message"] ?? T.t("Device added successfully", "උපාංගය සාර්ථකව එකතු විය")).toString());
         if (!mounted) return;
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => DashboardPage()),
         );
       } else {
-        _showSnack((data["message"] ?? "Failed to add device").toString());
+        _showSnack((data["message"] ?? T.t("Failed to add device", "උපාංගය එකතු කිරීම අසාර්ථකයි")).toString());
       }
     } catch (e) {
-      _showSnack("Error: $e");
+      _showSnack(T.t("Error: $e", "දෝෂය: $e"));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -135,8 +123,6 @@ class _AddDevicePageState extends State<AddDevicePage> {
 
   @override
   void dispose() {
-    _firstNameCtrl.dispose();
-    _emailCtrl.dispose();
     _deviceNameCtrl.dispose();
     _locationCtrl.dispose();
     super.dispose();
@@ -150,9 +136,9 @@ class _AddDevicePageState extends State<AddDevicePage> {
         child: Column(
           children: [
             const SizedBox(height: 40),
-            const Text(
-              "Add Device",
-              style: TextStyle(
+            Text(
+              T.t("Add Pump", "පම්ප් එක එක් කරන්න"),
+              style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
                 color: Color(0xFF1A5319),
@@ -164,23 +150,29 @@ class _AddDevicePageState extends State<AddDevicePage> {
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 22),
               decoration: const BoxDecoration(
                 color: Color(0xFF1A5319),
-                borderRadius: BorderRadius.only(topRight: Radius.circular(120)),
+                borderRadius: BorderRadius.only(
+                  topRight: Radius.circular(120),
+                ),
               ),
               child: Column(
                 children: [
-                  _inputField(title: "First Name", controller: _firstNameCtrl, readOnly: true),
+                  _inputField(
+                    title: T.t("Pump Name", "පම්ප් නාමය"),
+                    controller: _deviceNameCtrl,
+                    hintText: T.t("Enter suitable name for your pump", "ඔබගේ පම්ප් එකට සුදුසු නමක් ලියන්න"),
+                  ),
                   const SizedBox(height: 12),
-                  _inputField(title: "Email", controller: _emailCtrl, readOnly: true),
-                  const SizedBox(height: 12),
-                  _inputField(title: "Device Name", controller: _deviceNameCtrl),
-                  const SizedBox(height: 12),
-                  _inputField(title: "Pump Location", controller: _locationCtrl),
+                  _inputField(
+                    title: T.t("Pump Location", "පම්ප් ස්ථානය"),
+                    controller: _locationCtrl,
+                    hintText: T.t("Where is your pump locate?", "ඔබගේ පම්ප් එක පිහිටා ඇති ස්ථානය කොහිද?"),
+                  ),
                   const SizedBox(height: 14),
-                  const Align(
+                  Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
-                      "Already added the device then skip",
-                      style: TextStyle(
+                      T.t("Already added the device then skip", "උපාංගය දැනටමත් එක් කරලා නම් Skip කරන්න"),
+                      style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -204,9 +196,9 @@ class _AddDevicePageState extends State<AddDevicePage> {
                               height: 18,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : const Text(
-                              "Add",
-                              style: TextStyle(
+                          : Text(
+                              T.t("Add", "එක් කරන්න"),
+                              style: const TextStyle(
                                 color: Colors.black,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -225,9 +217,9 @@ class _AddDevicePageState extends State<AddDevicePage> {
                         border: Border.all(color: Colors.white, width: 1),
                       ),
                       alignment: Alignment.center,
-                      child: const Text(
-                        "Skip",
-                        style: TextStyle(
+                      child: Text(
+                        T.t("Skip", "මඟහරින්න"),
+                        style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
                         ),
@@ -246,7 +238,7 @@ class _AddDevicePageState extends State<AddDevicePage> {
   Widget _inputField({
     required String title,
     required TextEditingController controller,
-    bool readOnly = false,
+    String? hintText,
   }) {
     return Container(
       width: double.infinity,
@@ -269,13 +261,17 @@ class _AddDevicePageState extends State<AddDevicePage> {
           const SizedBox(height: 4),
           TextField(
             controller: controller,
-            readOnly: readOnly,
             style: const TextStyle(color: Colors.white, fontSize: 14),
             cursorColor: Colors.white,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               isDense: true,
               contentPadding: EdgeInsets.zero,
               border: InputBorder.none,
+              hintText: hintText,
+              hintStyle: const TextStyle(
+                color: Colors.white60,
+                fontSize: 13,
+              ),
             ),
           ),
         ],

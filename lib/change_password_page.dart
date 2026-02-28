@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'second_page.dart';
 import 'package:http/http.dart' as http;
+
+import 'app_lang.dart';
+import 'second_page.dart';
 
 class ChangePasswordPage extends StatefulWidget {
   const ChangePasswordPage({super.key});
@@ -21,14 +23,9 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
   bool _sendingOtp = false;
   bool _updatingPw = false;
 
-  
-  static const String baseUrl =
-      "http://192.168.109.136/flutter_application_2-main/api";
-
-  
+  static const String baseUrl = "http://10.0.2.2/flutter_application_2-main/api";
   static const String sendOtpUrl = "$baseUrl/PHPMailer/src/send_reset_otp.php";
-  static const String changePwUrl =
-      "$baseUrl/verify_otp_and_change_password.php";
+  static const String changePwUrl = "$baseUrl/verify_otp_and_change_password.php";
 
   void _showSnack(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
@@ -51,14 +48,16 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       }
       return {
         "success": false,
-        "message": "Invalid JSON format",
+        "message": T.t("Invalid JSON format", "Invalid JSON ආකෘතිය"),
         "_httpStatus": res.statusCode
       };
     } catch (_) {
       return {
         "success": false,
-        "message":
-            "Server did not return JSON. HTTP ${res.statusCode}\nURL: $url\nBody: ${res.body}",
+        "message": T.t(
+          "Server did not return JSON. HTTP ${res.statusCode}\nURL: $url\nBody: ${res.body}",
+          "Server එක JSON ආපසු දෙන්නේ නැහැ. HTTP ${res.statusCode}\nURL: $url\nBody: ${res.body}",
+        ),
         "_httpStatus": res.statusCode
       };
     }
@@ -68,7 +67,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     final email = emailController.text.trim();
 
     if (!_isValidEmail(email)) {
-      _showSnack("Enter a valid email");
+      _showSnack(T.t("Enter a valid email", "වලංගු ඊමේල් ලිපිනයක් ඇතුළත් කරන්න"));
       return;
     }
 
@@ -79,7 +78,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     if (!mounted) return;
     setState(() => _sendingOtp = false);
 
-    _showSnack(data["message"]?.toString() ?? "Done");
+    _showSnack(data["message"]?.toString() ?? T.t("Done", "හරි"));
   }
 
   Future<void> updatePassword() async {
@@ -89,19 +88,19 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     final confirm = confirmPwController.text.trim();
 
     if (!_isValidEmail(email)) {
-      _showSnack("Enter a valid email");
+      _showSnack(T.t("Enter a valid email", "වලංගු ඊමේල් ලිපිනයක් ඇතුළත් කරන්න"));
       return;
     }
     if (otp.length != 6) {
-      _showSnack("OTP must be 6 digits");
+      _showSnack(T.t("OTP must be 6 digits", "OTP එක ඉලක්කම් 6ක් විය යුතුයි"));
       return;
     }
     if (newPw.length != 6) {
-      _showSnack("Password must be exactly 6 characters");
+      _showSnack(T.t("Password must be exactly 6 characters", "මුරපදය අකුරු 6ක් විය යුතුයි"));
       return;
     }
     if (newPw != confirm) {
-      _showSnack("Passwords do not match");
+      _showSnack(T.t("Passwords do not match", "මුරපද එකිනෙකට ගැළපෙන්නේ නැහැ"));
       return;
     }
 
@@ -117,17 +116,16 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     setState(() => _updatingPw = false);
 
     final ok = data["success"] == true;
-    _showSnack(data["message"]?.toString() ?? "Done");
+    _showSnack(data["message"]?.toString() ?? T.t("Done", "හරි"));
 
     if (ok) {
       otpController.clear();
       newPwController.clear();
       confirmPwController.clear();
 
-      
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (_) => SecondPage()),
+        MaterialPageRoute(builder: (_) => const SecondPage()),
         (route) => false,
       );
     }
@@ -158,20 +156,23 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
               // Back
               InkWell(
                 onTap: () => Navigator.pop(context),
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.arrow_back, color: Colors.green),
-                    SizedBox(width: 8),
-                    Text("Back", style: TextStyle(color: Colors.green)),
+                    const Icon(Icons.arrow_back, color: Colors.green),
+                    const SizedBox(width: 8),
+                    Text(
+                      T.t("Back", "ආපසු"),
+                      style: const TextStyle(color: Colors.green),
+                    ),
                   ],
                 ),
               ),
               const SizedBox(height: 20),
-              const Center(
+              Center(
                 child: Text(
-                  "Change Password",
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  T.t("Change Password", "මුරපදය වෙනස් කරන්න"),
+                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
               ),
               const SizedBox(height: 24),
@@ -191,9 +192,9 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      "Update your password",
-                      style: TextStyle(
+                    Text(
+                      T.t("Update your password", "ඔබගේ මුරපදය යාවත්කාලීන කරන්න"),
+                      style: const TextStyle(
                         color: Colors.green,
                         fontWeight: FontWeight.bold,
                       ),
@@ -203,7 +204,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                       controller: emailController,
                       keyboardType: TextInputType.emailAddress,
                       decoration: InputDecoration(
-                        hintText: "Email",
+                        hintText: T.t("Email", "ඊමේල්"),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -222,7 +223,9 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                           ),
                         ),
                         child: Text(
-                          _sendingOtp ? "Sending..." : "Send Verification Code",
+                          _sendingOtp
+                              ? T.t("Sending...", "යවමින්...")
+                              : T.t("Send Verification Code", "තහවුරු කිරීමේ කේතය යවන්න"),
                           style: const TextStyle(color: Colors.white),
                         ),
                       ),
@@ -233,7 +236,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                       keyboardType: TextInputType.number,
                       maxLength: 6,
                       decoration: InputDecoration(
-                        hintText: "OTP Code (6 digits)",
+                        hintText: T.t("OTP Code (6 digits)", "OTP කේතය (ඉලක්කම් 6)"),
                         counterText: "",
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -246,7 +249,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                       obscureText: true,
                       maxLength: 6,
                       decoration: InputDecoration(
-                        hintText: "New Password (6 characters)",
+                        hintText: T.t("New Password (6 characters)", "නව මුරපදය (අකුරු 6)"),
                         counterText: "",
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -259,7 +262,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                       obscureText: true,
                       maxLength: 6,
                       decoration: InputDecoration(
-                        hintText: "Confirm New Password",
+                        hintText: T.t("Confirm New Password", "නව මුරපදය තහවුරු කරන්න"),
                         counterText: "",
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -279,7 +282,9 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                           ),
                         ),
                         child: Text(
-                          _updatingPw ? "Updating..." : "Update Password",
+                          _updatingPw
+                              ? T.t("Updating...", "යාවත්කාලීන කරමින්...")
+                              : T.t("Update Password", "මුරපදය යාවත්කාලීන කරන්න"),
                           style: const TextStyle(color: Colors.white),
                         ),
                       ),

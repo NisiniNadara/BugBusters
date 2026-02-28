@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'app_lang.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -164,10 +165,10 @@ class _AlertsPageState extends State<AlertsPage> {
             const SizedBox(height: 12),
 
             // Title
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Text(
-                "Alerts",
+                T.t("Alerts","ඇලර්ට්ස්"),
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
@@ -176,7 +177,7 @@ class _AlertsPageState extends State<AlertsPage> {
               ),
             ),
             const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Divider(thickness: 2),
             ),
             const SizedBox(height: 6),
@@ -371,7 +372,7 @@ class _BottomNavBar extends StatelessWidget {
         children: [
           BottomNavItem(
             icon: Icons.dashboard,
-            label: "Dashboard",
+            label: T.t("Dashboard","ඩෑෂ්බෝඩ්"),
             onTap: () {
               Navigator.pushReplacement(
                 context,
@@ -381,7 +382,7 @@ class _BottomNavBar extends StatelessWidget {
           ),
           BottomNavItem(
             icon: Icons.favorite,
-            label: "Health",
+            label: T.t("Health","සෞඛ්‍යය"),
             onTap: () {
               Navigator.pushReplacement(
                 context,
@@ -389,14 +390,14 @@ class _BottomNavBar extends StatelessWidget {
               );
             },
           ),
-          const BottomNavItem(
+          BottomNavItem(
             icon: Icons.warning_amber_outlined,
-            label: "Alerts",
+            label: T.t("Alerts","ඇලර්ට්ස්"),
             isActive: true,
           ),
           BottomNavItem(
             icon: Icons.settings,
-            label: "Settings",
+            label: T.t("Settings","සැකසුම්"),
             onTap: () {
               Navigator.pushReplacement(
                 context,
@@ -416,7 +417,7 @@ class BottomNavItem extends StatelessWidget {
   final bool isActive;
   final VoidCallback? onTap;
 
-  const BottomNavItem({
+  BottomNavItem({
     super.key,
     required this.icon,
     required this.label,

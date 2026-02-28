@@ -2,7 +2,7 @@
 header("Content-Type: application/json; charset=UTF-8");
 require_once __DIR__ . "/db.php";
 
-//  NEW dummy row each request
+// NEW dummy row each request
 $temperature = rand(60, 85);
 $vibration   = rand(10, 45) / 10;
 $pressure    = rand(30, 60);

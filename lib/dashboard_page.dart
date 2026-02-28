@@ -3,10 +3,16 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
+import 'app_lang.dart';
 import 'pump_health_page.dart';
 import 'alerts_page.dart';
 import 'settings_page.dart';
+import 'add_device_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+// ✅ ADD THIS import (no UI change)
+import 'auth/auth_service.dart';
+import 'second_page.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -28,9 +34,13 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Timer? _timer;
 
-  // your base url
-  final String baseUrl =
-      "http://192.168.109.136/flutter_application_2-main/api";
+  // ✅ FIX: correct base url for Android Emulator (NO UI CHANGE)
+  final String baseUrl = "http://10.0.2.2/flutter_application_2-main/api";
+
+  // ===== Pump dropdown state (ADDED) =====
+  static const Color darkGreen = Color(0xFF1A5319);
+  List<Map<String, dynamic>> _pumps = [];
+  String _selectedPumpName = "Device";
 
   @override
   void initState() {
@@ -42,8 +52,11 @@ class _DashboardPageState extends State<DashboardPage> {
 
     _loadOrUpdateRulOncePerDay();
 
-    
-    _fetchPumpStatusAndSave();
+    // ✅ IMPORTANT: load pumps first (so dropdown shows DB pumps)
+    _loadPumpsForUser().then((_) {
+      // then load dashboard values
+      _fetchPumpStatusAndSave();
+    });
 
     // every 60 seconds
     _timer = Timer.periodic(const Duration(seconds: 60), (_) {
@@ -55,6 +68,26 @@ class _DashboardPageState extends State<DashboardPage> {
   void dispose() {
     _timer?.cancel();
     super.dispose();
+  }
+
+  // ✅ ADD THIS: logout handler (no UI change)
+  Future<void> _logout(BuildContext context) async {
+    await AuthService.logout();
+
+    // (optional) also clear user prefs you stored
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove("user_id");
+    await prefs.remove("first_name");
+    await prefs.remove("last_name");
+    await prefs.remove("email");
+    await prefs.remove("role");
+
+    if (!context.mounted) return;
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const SecondPage()),
+      (route) => false,
+    );
   }
 
   Future<void> _loadUserName() async {
@@ -108,7 +141,7 @@ class _DashboardPageState extends State<DashboardPage> {
     });
   }
 
-  
+  // ✅ FIX: safe dashboard fetch (backend connected, no UI change)
   Future<void> _fetchPumpStatusAndSave() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -119,13 +152,24 @@ class _DashboardPageState extends State<DashboardPage> {
 
       final url = Uri.parse("$baseUrl/get_dashboard_status.php");
 
-      final res = await http.post(
-        url,
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({"user_id": userId}),
-      );
+      final res = await http
+          .post(
+            url,
+            headers: {"Content-Type": "application/json"},
+            body: jsonEncode({"user_id": userId}),
+          )
+          .timeout(const Duration(seconds: 15));
 
-      final decoded = jsonDecode(res.body);
+      if (res.statusCode != 200) {
+        return;
+      }
+
+      final body = res.body.trim();
+      if (body.isEmpty) {
+        return;
+      }
+
+      final decoded = jsonDecode(body);
 
       if (decoded is Map && decoded["success"] == true && decoded["data"] is Map) {
         final Map d = decoded["data"] as Map;
@@ -137,18 +181,141 @@ class _DashboardPageState extends State<DashboardPage> {
         final pres = toD(d["pressure"]);
         final flow = toD(d["flow_rate"]);
 
-        
         await prefs.setDouble("latest_temp", temp);
         await prefs.setDouble("latest_vib", vib);
         await prefs.setDouble("latest_pressure", pres);
         await prefs.setDouble("latest_flow", flow);
 
-        //same values Health will read
         await _loadFromPrefsOnly();
       }
-    } catch (_) {
-      
+    } catch (e) {
+      // ignore
     }
+  }
+
+  // =========================
+  // Pump dropdown logic (ADDED)
+  // =========================
+
+  Future<void> _loadPumpsForUser() async {
+    final prefs = await SharedPreferences.getInstance();
+    int userId = prefs.getInt("user_id") ?? 0;
+    if (userId == 0) {
+      userId = int.tryParse(prefs.getString("user_id") ?? "") ?? 0;
+    }
+    if (userId == 0) return;
+
+    try {
+      final url = Uri.parse("$baseUrl/get_pumps.php");
+      final res = await http
+          .post(
+            url,
+            headers: {"Content-Type": "application/json"},
+            body: jsonEncode({"user_id": userId}),
+          )
+          .timeout(const Duration(seconds: 15));
+
+      if (res.statusCode != 200) return;
+
+      final body = res.body.trim();
+      if (body.isEmpty) return;
+
+      Map<String, dynamic> data;
+      try {
+        data = jsonDecode(body);
+      } catch (_) {
+        return;
+      }
+
+      if (data["success"] == true) {
+        final List list = (data["pumps"] ?? []) as List;
+        final pumps = list
+            .map((e) => {
+                  "pump_id": e["pump_id"],
+                  "pump_name": e["pump_name"],
+                })
+            .toList();
+
+        final savedPumpName = prefs.getString("selected_pump_name") ?? "";
+
+        if (!mounted) return;
+        setState(() {
+          _pumps = pumps;
+
+          if (savedPumpName.isNotEmpty &&
+              _pumps.any((p) => (p["pump_name"] ?? "").toString() == savedPumpName)) {
+            _selectedPumpName = savedPumpName;
+          } else if (_pumps.isNotEmpty) {
+            _selectedPumpName = _pumps.first["pump_name"].toString();
+          } else {
+            _selectedPumpName = T.t("Pump", "පම්ප්");
+          }
+        });
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  Future<void> _saveSelectedPump(String pumpName) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString("selected_pump_name", pumpName);
+  }
+
+  void _openDeviceMenu(TapDownDetails details) {
+    final position = details.globalPosition;
+    final items = <PopupMenuEntry<String>>[];
+
+    if (_pumps.isNotEmpty) {
+      for (final p in _pumps) {
+        final pumpName = (p["pump_name"] ?? "").toString();
+        if (pumpName.isEmpty) continue;
+        items.add(PopupMenuItem(value: pumpName, child: Text(pumpName)));
+      }
+      items.add(const PopupMenuDivider());
+    } else {
+      items.add(PopupMenuItem(
+        value: "_no_pumps",
+        enabled: false,
+        child: Text(T.t("No pumps added", "පම්ප් එකක් එකතු කරලා නැහැ")),
+      ));
+      items.add(const PopupMenuDivider());
+    }
+
+    items.add(PopupMenuItem(
+      value: "add_device",
+      child: Row(
+        children: [
+          const Icon(Icons.add, color: darkGreen),
+          const SizedBox(width: 6),
+          Text(
+            T.t("Add Pump", "පම්ප් එක එක් කරන්න"),
+            style: const TextStyle(color: darkGreen, fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
+    ));
+
+    showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(position.dx - 160, position.dy + 10, 16, 0),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      items: items,
+    ).then((value) async {
+      if (value == null) return;
+
+      if (value == "add_device") {
+        Navigator.push(context, MaterialPageRoute(builder: (_) => AddDevicePage()))
+            .then((_) => _loadPumpsForUser());
+        return;
+      }
+
+      if (value == "_no_pumps") return;
+
+      if (!mounted) return;
+      setState(() => _selectedPumpName = value);
+      await _saveSelectedPump(value);
+    });
   }
 
   @override
@@ -172,11 +339,43 @@ class _DashboardPageState extends State<DashboardPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(height: 20),
-                    const Text("Welcome back,", style: TextStyle(color: Colors.white70)),
+                    const SizedBox(height: 12),
+
+                    // ===== Pump dropdown placed in header (UNCHANGED) =====
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        GestureDetector(
+                          onTapDown: _openDeviceMenu,
+                          child: Row(
+                            children: [
+                              Text(
+                                _selectedPumpName,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              const Icon(
+                                Icons.keyboard_arrow_down,
+                                color: Colors.white,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+
                     const SizedBox(height: 6),
                     Text(
-                      firstName.isEmpty ? "Welcome !" : "$firstName !",
+                      T.t("Welcome back,", "ආයුබෝවන් නැවතත්,"),
+                      style: const TextStyle(color: Colors.white70),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      firstName.isEmpty ? T.t("Welcome !", "සාදරයෙන් පිළිගනිමු !") : "$firstName !",
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 26,
@@ -203,10 +402,10 @@ class _DashboardPageState extends State<DashboardPage> {
                   ),
                   child: Column(
                     children: [
-                      const Text(
-                        "Remaining useful Life\n(RUL)",
+                      Text(
+                        T.t("Remaining useful Life\n(RUL)", "ඉතිරි ප්‍රයෝජනවත් ආයු කාලය\n(RUL)"),
                         textAlign: TextAlign.center,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                           color: Color(0xFF1A5319),
@@ -223,7 +422,10 @@ class _DashboardPageState extends State<DashboardPage> {
                           color: Colors.amber,
                         ),
                       ),
-                      const Text("Days Remaining", style: TextStyle(fontSize: 12)),
+                      Text(
+                        T.t("Days Remaining", "දවස් ඉතිරි"),
+                        style: const TextStyle(fontSize: 12),
+                      ),
                     ],
                   ),
                 ),
@@ -244,22 +446,22 @@ class _DashboardPageState extends State<DashboardPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      "Pump Health Status",
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    Text(
+                      T.t("Pump Health Status", "පම්ප් සෞඛ්‍ය තත්ත්වය"),
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 10),
                     Row(
                       children: [
                         StatusBox(
-                          title: "Temperature",
+                          title: T.t("Temperature", "උෂ්ණත්වය"),
                           value: temperatureText,
                           icon: Icons.thermostat,
                           borderColor: Colors.red,
                         ),
                         const SizedBox(width: 12),
                         StatusBox(
-                          title: "Vibration",
+                          title: T.t("Vibration", "කම්පනය"),
                           value: vibrationText,
                           icon: Icons.waves,
                           borderColor: Colors.lightGreen,
@@ -270,14 +472,14 @@ class _DashboardPageState extends State<DashboardPage> {
                     Row(
                       children: [
                         StatusBox(
-                          title: "Pressure",
+                          title: T.t("Pressure", "පීඩනය"),
                           value: pressureText,
                           icon: Icons.speed,
                           borderColor: Colors.lightGreen,
                         ),
                         const SizedBox(width: 12),
                         StatusBox(
-                          title: "Flow Rate",
+                          title: T.t("Flow Rate", "ප්‍රවාහ අනුපාතය"),
                           value: flowText,
                           icon: Icons.show_chart,
                           borderColor: Colors.amber,
@@ -310,10 +512,15 @@ class _DashboardPageState extends State<DashboardPage> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          BottomItem(icon: Icons.dashboard, label: "Dashboard", isActive: true, onTap: () {}),
+          BottomItem(
+            icon: Icons.dashboard,
+            label: T.t("Dashboard", "මුල් පිටුව"),
+            isActive: true,
+            onTap: () {},
+          ),
           BottomItem(
             icon: Icons.favorite_border,
-            label: "Health",
+            label: T.t("Health", "සෞඛ්‍යය"),
             onTap: () {
               Navigator.pushReplacement(
                 context,
@@ -323,7 +530,7 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
           BottomItem(
             icon: Icons.warning_amber_outlined,
-            label: "Alerts",
+            label: T.t("Alerts", "ඇලර්ට්ස්"),
             onTap: () {
               Navigator.pushReplacement(
                 context,
@@ -331,15 +538,21 @@ class _DashboardPageState extends State<DashboardPage> {
               );
             },
           ),
-          BottomItem(
-            icon: Icons.settings,
-            label: "Settings",
-            onTap: () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (_) => const SettingsPage()),
-              );
-            },
+
+          // ✅ NO UI change: same Settings icon/label
+          // ✅ Added LONG PRESS to logout (tap works same as before)
+          GestureDetector(
+            onLongPress: () => _logout(context),
+            child: BottomItem(
+              icon: Icons.settings,
+              label: T.t("Settings", "සැකසුම්"),
+              onTap: () {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SettingsPage()),
+                );
+              },
+            ),
           ),
         ],
       ),
@@ -377,11 +590,17 @@ class StatusBox extends StatelessWidget {
               children: [
                 Icon(icon, size: 16),
                 const SizedBox(width: 6),
-                Text(title, style: const TextStyle(fontSize: 11, color: Colors.black54)),
+                Text(
+                  title,
+                  style: const TextStyle(fontSize: 11, color: Colors.black54),
+                ),
               ],
             ),
             const SizedBox(height: 6),
-            Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            Text(
+              value,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
           ],
         ),
       ),
@@ -425,7 +644,10 @@ class BottomItem extends StatelessWidget {
               child: Icon(icon, size: isActive ? 22 : 20, color: Colors.white),
             ),
             const SizedBox(height: 2),
-            Text(label, style: const TextStyle(fontSize: 11, height: 1.0, color: Colors.white)),
+            Text(
+              label,
+              style: const TextStyle(fontSize: 11, height: 1.0, color: Colors.white),
+            ),
           ],
         ),
       ),

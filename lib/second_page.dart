@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+// ✅ ADD THIS import (no UI change)
+import 'auth/auth_service.dart';
+
+import 'app_lang.dart';
 import 'change_password_page.dart';
 import 'sign_up_page.dart';
 import 'add_device_page.dart';
@@ -37,11 +41,11 @@ class _SecondPageState extends State<SecondPage> {
     final password = _passwordController.text.trim();
 
     if (email.isEmpty || password.isEmpty) {
-      _msg("empty fields");
+      _msg(T.t("Empty fields", "හිස් තැන් ඇත"));
       return;
     }
     if (!_isValidEmail(email)) {
-      _msg("invalid email");
+      _msg(T.t("Invalid email", "වැරදි ඊමේල් ලිපිනයක්"));
       return;
     }
 
@@ -51,37 +55,37 @@ class _SecondPageState extends State<SecondPage> {
       final result = await ApiService.login(email: email, password: password);
 
       if (result["success"] == true) {
-        
         final user = result["user"];
 
         if (user == null) {
-          _msg("Login success but user data missing");
+          _msg(T.t("Login success but user data missing", "පිවිසීම සාර්ථකයි, නමුත් පරිශීලක දත්ත නැත"));
           return;
         }
 
         final prefs = await SharedPreferences.getInstance();
 
-        
         final int userId = int.tryParse(user["user_id"].toString()) ?? 0;
         await prefs.setInt("user_id", userId);
 
-      
         await prefs.setString("first_name", (user["first_name"] ?? "").toString());
         await prefs.setString("last_name", (user["last_name"] ?? "").toString());
         await prefs.setString("email", (user["email"] ?? "").toString());
         await prefs.setString("role", (user["role"] ?? "").toString());
 
-        // Go to AddDevicePage
+        // ✅ ADD THIS (important): mark user as logged in for next app open
+        // Use any stable value as token; if your API returns a real token, store it here instead.
+        await AuthService.loginSuccess(token: userId.toString());
+
         if (!mounted) return;
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => AddDevicePage()),
         );
       } else {
-        _msg((result["message"] ?? "Login failed").toString());
+        _msg((result["message"] ?? T.t("Login failed", "පිවිසීම අසාර්ථකයි")).toString());
       }
     } catch (e) {
-      _msg("Error: $e");
+      _msg(T.t("Error: $e", "දෝෂය: $e"));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -105,13 +109,36 @@ class _SecondPageState extends State<SecondPage> {
               padding: const EdgeInsets.only(top: 20),
               child: Text(
                 'BUG BUSTERS',
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 2,
                 ),
               ),
             ),
+
+            // ✅ Language buttons (small, no UI redesign)
+            const SizedBox(height: 6),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                TextButton(
+                  onPressed: () async {
+                    await AppLangController.instance.setLang("en");
+                    setState(() {});
+                  },
+                  child: const Text("English"),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    await AppLangController.instance.setLang("si");
+                    setState(() {});
+                  },
+                  child: const Text("සිංහල"),
+                ),
+              ],
+            ),
+
             const SizedBox(height: 40),
             Expanded(child: Container()),
             Container(
@@ -124,9 +151,9 @@ class _SecondPageState extends State<SecondPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    '     User',
-                    style: TextStyle(
+                  Text(
+                    T.t('     User', '     පරිශීලකයා'),
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 26,
                       fontWeight: FontWeight.bold,
@@ -138,15 +165,15 @@ class _SecondPageState extends State<SecondPage> {
                     controller: _emailController,
                     style: const TextStyle(color: Colors.white),
                     decoration: InputDecoration(
-                      hintText: 'Enter email',
-                      hintStyle: TextStyle(color: Colors.white70),
+                      hintText: T.t('Enter email', 'ඊමේල් ලියන්න'),
+                      hintStyle: const TextStyle(color: Colors.white70),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Colors.white),
+                        borderSide: const BorderSide(color: Colors.white),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Colors.white),
+                        borderSide: const BorderSide(color: Colors.white),
                       ),
                     ),
                   ),
@@ -158,15 +185,15 @@ class _SecondPageState extends State<SecondPage> {
                     obscureText: true,
                     style: const TextStyle(color: Colors.white),
                     decoration: InputDecoration(
-                      hintText: 'Enter password',
-                      hintStyle: TextStyle(color: Colors.white70),
+                      hintText: T.t('Enter password', 'මුරපදය ලියන්න'),
+                      hintStyle: const TextStyle(color: Colors.white70),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Colors.white),
+                        borderSide: const BorderSide(color: Colors.white),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Colors.white),
+                        borderSide: const BorderSide(color: Colors.white),
                       ),
                     ),
                   ),
@@ -178,8 +205,8 @@ class _SecondPageState extends State<SecondPage> {
                     child: GestureDetector(
                       onTap: _openForgotPassword,
                       child: Text(
-                        'forget password?',
-                        style: TextStyle(
+                        T.t('forget password?', 'මුරපදය අමතකද?'),
+                        style: const TextStyle(
                           color: Colors.white70,
                           fontSize: 12,
                           decoration: TextDecoration.underline,
@@ -207,9 +234,9 @@ class _SecondPageState extends State<SecondPage> {
                               height: 18,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : const Text(
-                              'Login',
-                              style: TextStyle(
+                          : Text(
+                              T.t('Login', 'පිවිසෙන්න'),
+                              style: const TextStyle(
                                 color: Colors.black,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -228,8 +255,8 @@ class _SecondPageState extends State<SecondPage> {
                         );
                       },
                       child: Text(
-                        "Don't have any account? Sign Up",
-                        style: TextStyle(
+                        T.t("Don't have any account? Sign Up", "ගිණුමක් නැද්ද? ලියාපදිංචි වන්න"),
+                        style: const TextStyle(
                           color: Colors.white70,
                           fontSize: 12,
                           decoration: TextDecoration.underline,

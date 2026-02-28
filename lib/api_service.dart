@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 
 class ApiService {
   static const String baseUrl =
-  "http://192.168.109.136/flutter_application_2-main/api";
+      "http://10.0.2.2/flutter_application_2-main/api";
 
   // ---------- CORE POST ----------
   static Future<Map<String, dynamic>> _post(
@@ -24,7 +24,28 @@ class ApiService {
         return {"success": false, "alerts": [], "message": "Empty response"};
       }
 
-      return jsonDecode(raw);
+      // ✅ RELEVANT CHANGE ONLY: Safe JSON decode (prevents <br /> crash)
+      dynamic decoded;
+      try {
+        decoded = jsonDecode(raw);
+      } catch (_) {
+        final short = raw.length > 250 ? raw.substring(0, 250) : raw;
+        return {
+          "success": false,
+          "alerts": [],
+          "message": "Server returned non-JSON (HTTP ${res.statusCode}): $short",
+        };
+      }
+
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+
+      return {
+        "success": false,
+        "alerts": [],
+        "message": "Invalid JSON format from server",
+      };
     } catch (e) {
       return {
         "success": false,
@@ -34,7 +55,7 @@ class ApiService {
     }
   }
 
-  // FETCH ALERTS 
+  // FETCH ALERTS
   static Future<Map<String, dynamic>> fetchAlerts({
     required dynamic userId,
   }) async {
@@ -42,7 +63,7 @@ class ApiService {
     return _post("fetch_alerts.php", {"user_id": uid});
   }
 
-  //LOGIN
+  // LOGIN
   static Future<Map<String, dynamic>> login({
     required String email,
     required String password,
@@ -53,7 +74,7 @@ class ApiService {
     });
   }
 
-  // REGISTER 
+  // REGISTER
   static Future<Map<String, dynamic>> register({
     required String firstName,
     required String lastName,
@@ -72,7 +93,7 @@ class ApiService {
     });
   }
 
-  // ADD PUMP 
+  // ADD PUMP
   static Future<Map<String, dynamic>> addPump({
     required String email,
     required String pumpName,
